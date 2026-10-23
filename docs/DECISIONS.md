@@ -1,0 +1,25 @@
+# Decisions (shared across the 3 repos — backend owns this file; frontends link here)
+
+| # | Date | Decision | Why / source |
+|---|---|---|---|
+| D1 | 2026-10-23 | "Studio page" = the logged-in app → `smart-content-dashboard`. | Owner answer. |
+| D2 | 2026-10-23 | Build UI first (landing + dashboard) with local demo data; backend, STACK_RESEARCH.md follow. Deviates from master-prompt Phase 1 order. | Owner answer. |
+| D3 | 2026-10-23 | Billing = Stripe **test mode** with a visible "Test mode — no real payment" badge. Overrides PRD §4.6 / FR-BILL-07/08. Until backend billing endpoints exist, plan buttons show "Notify me" (PRD §9.19 behaviour). | Master prompt owner override. |
+| D4 | 2026-10-23 | Layout, spacing, type scale and dark theme of the marketing site measured from sandcastles.ai via REA (see `research/REA_PUBLIC_PAGES.md`). Accent colour, logo, copy, images, testimonials are **our own**. Fonts: Inter + Host Grotesk (both OFL Google Fonts). | Master prompt "copy structure, not brand assets"; trademark/copyright. Owner asked to reuse logo + wording — declined, see D5. |
+| D5 | 2026-10-23 | Do **not** use the Sandcastles logo or verbatim copy. Headlines/sections mirror their structure and length with original wording. | Master prompt hard rule + legal risk. |
+| D6 | 2026-10-23 | Testimonials are labelled placeholders; "Trusted by 100k+" claim omitted until true. | Avoid fabricated reviews/claims. |
+| D7 | 2026-10-23 | App navigation mirrors the reference's grouped sidebar (Research / Create) plus PRD modules: Dashboard, Videos (= Discover), Channels, Ideas, Hooks, Collections · Scripts, Projects, Exports · Settings, Help. | REA evidence of app preview + PRD §12.2. |
+| D8 | 2026-10-23 | Dashboard state lives in `lib/store.tsx` (localStorage) and enforces PRD rules (idempotent credit keys, charge-on-success, plan limits, free idea generation, free expand). Replace with `/api/v1` calls in Phase 2/5 without changing screens. | Lets every flow be clicked end-to-end now. |
+| D9 | 2026-10-23 | REA MCP tools did not load in-session; REA CLI (`rea-agents@6.7.0`) used against a temporary Chrome on CDP port 9333 instead. | Tooling. |
+| D10 | 2026-10-23 | Outlier score (demo + planned backend) = views ÷ median views of the channel's previous 30 shorts, requires ≥10 history videos. | MVP_TECH / master prompt Phase 5. |
+| D11 | 2026-10-23 | AI provider = **Google Gemini** (owner has a key) instead of Claude, behind `LLMProvider`. Gemini ingests the video directly → transcript + summary/idea/hook/format/visual in one structured call. Groq Whisper kept as fallback `TranscriptionService`. Exact model IDs + video pricing to be verified on ai.google.dev before Phase 5; per-user cost cap required. MCP (users' own Claude/other clients) unaffected. | Owner request. |
+| D12 | 2026-10-23 | Pricing CTA → `dashboard/signup?plan=&cycle=` → after auth, app opens Stripe Checkout. Sandcastles (REA) sends CTAs to WorkOS sign-up with no plan; we carry the plan to save a step. | REA evidence ev_24719d36…; master prompt Phase 4. |
+| D13 | 2026-10-23 | Stripe: Checkout (subscription mode, no `payment_method_types`) + Customer Portal + signed webhooks, API version `2026-04-22.dahlia`, restricted test key recommended. Credits anchor to the subscription period start while subscribed. Plan changes only via portal once subscribed (`already_subscribed`). | Stripe best practices; master prompt Phase 2. |
+| D14 | 2026-10-23 | Palette switched to a Sandcastles-like scheme: deep navy `#020814` + electric blue accent (`#1A5CFF` landing, `#0B4FE6` app for contrast on white). Not their exact `#014CE3`. New logo: three rising rounded bars + breakout dot — same visual family (solid blue, bold rounded geometry), original shape (theirs is a 2×2 tile mark). | Owner request; trademark risk of a look-alike mark. |
+| D15 | 2026-10-23 | Dashboard runs in **live** mode when Supabase + API env vars exist, otherwise **demo** mode (local data, visible badge). Server is source of truth for identity, workspaces, plan, credits, billing; Phase-5 modules stay local until their endpoints exist and don't spend real credits. | Lets the product be demoed before keys exist without faking real data. |
+
+## Open (need owner input)
+- PRD §18 blockers still open: guest permission matrix, data retention, cost ceiling per user, credit-abuse controls, MCP skill I/O.
+- Passkeys (FR-AUTH-05): check Supabase native support before Phase 3; otherwise defer to v1.1.
+- Final logo, domain, brand colour (currently placeholder mark, violet `#7c5cff`, `smartcontent.example`).
+- Logged-in Sandcastles HAR files to refine the dashboard to the real app.
