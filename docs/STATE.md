@@ -31,5 +31,13 @@
 ## Done — step 3: dashboard connected
 `/me` now also returns `subscription_status`, `billing_cycle`, `has_billing_account`. Dashboard uses Supabase Auth + this API in live mode (see dashboard docs/STATE.md). E2E-verified with a local JWKS stand-in.
 
-## Next — Phase 4/5
-Landing waitlist → `POST /waitlist`; then product features in approved order: Collections, Channels + Apify ingestion + outlier score, Discover, Deep Analysis (Gemini), Ideas/Hooks/Scripts/Projects/Exports, MCP.
+## Done — Phase 5 step 1: Collections
+- Tables `collections` + `collection_videos` (migration `0003`, RLS on Postgres).
+- Public, free reads (no auth, no credits): list with category/search/sort, detail, Markdown/JSON reference-sheet export (rate-limited).
+- Admin curation API (create/update/publish/delete, add/remove example videos with platform-checked https URLs), every write audited.
+- `uv run python -m scripts.seed_collections` seeds 8 clearly-labelled SAMPLE collections for dev/staging.
+- Dashboard Collections pages use the API in live mode (verified e2e: 6/6).
+- 41 tests; ruff + mypy clean.
+
+## Next — Phase 5 step 2: Channels + Apify ingestion + outlier score
+`ChannelProvider` interface + Apify adapters (TikTok/Instagram/YouTube), workspace watchlist API (plan limit 150/250/1000), `videos` table, background refresh job, outlier score = views ÷ median of the channel's previous 30 shorts (≥10 history). Needs `APIFY_TOKEN`.

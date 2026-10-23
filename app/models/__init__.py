@@ -5,7 +5,19 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, Uuid
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, Timestamped, utcnow
@@ -103,6 +115,57 @@ class StripeEvent(Timestamped, Base):
 
     id: Mapped[str] = mapped_column(String(80), primary_key=True)  # evt_…
     type: Mapped[str] = mapped_column(String(80), nullable=False)
+
+
+class Collection(Timestamped, Base):
+    """Team-curated group of outlier videos sharing one pattern (PRD §9.10). Free for everyone.
+    Users can't create their own in v1 (FR-COL-07) — only admins write."""
+
+    __tablename__ = "collections"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    slug: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    # formats | editing_styles | visual_hooks | signature_series
+    category: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    sub: Mapped[str] = mapped_column(String(80), default="", nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    breakdown: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    cover_hue: Mapped[str] = mapped_column(String(160), default="", nullable=False)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+    videos: Mapped[list["CollectionVideo"]] = relationship(
+        back_populates="collection",
+        cascade="all, delete-orphan",
+        order_by="CollectionVideo.position",
+    )
+
+
+class CollectionVideo(Timestamped, Base):
+    """One example inside a collection. Stores public metadata + our own breakdown notes —
+    never the creator's video file. (Links to the ingested `videos` table come with Phase 5 ingestion.)"""
+
+    __tablename__ = "collection_videos"
+    __table_args__ = (UniqueConstraint("collection_id", "url", name="uq_collection_videos_collection_url"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("collections.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    platform: Mapped[str] = mapped_column(String(16), nullable=False)  # tiktok | instagram | youtube
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    creator_handle: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    views: Mapped[int | None] = mapped_column(BigInteger)
+    outlier_score: Mapped[float | None] = mapped_column(Float)
+    transcript: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    collection: Mapped[Collection] = relationship(back_populates="videos")
 
 
 class WaitlistEntry(Timestamped, Base):

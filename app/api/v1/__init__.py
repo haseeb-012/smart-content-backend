@@ -1,8 +1,10 @@
 from fastapi import APIRouter
 
-from app.api.v1 import admin, billing, credits, me, plans, waitlist, workspaces
+from app.api.v1 import admin, billing, collections, credits, me, plans, waitlist, workspaces
 
 router = APIRouter(prefix="/api/v1")
+router.include_router(collections.router)
+router.include_router(collections.admin_router)
 router.include_router(billing.router)
 router.include_router(me.router)
 router.include_router(plans.router)

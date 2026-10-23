@@ -3,8 +3,9 @@
 import uuid
 from datetime import date, datetime
 from typing import Literal
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, ValidationInfo, field_validator
 
 PlanId = Literal["pro", "visionary", "titan"]
 
@@ -134,6 +135,101 @@ class AuditOut(Out):
     action: str
     details: dict
     created_at: datetime
+
+
+CollectionCategory = Literal["formats", "editing_styles", "visual_hooks", "signature_series"]
+Platform = Literal["tiktok", "instagram", "youtube"]
+PLATFORM_HOSTS = {
+    "tiktok": ("tiktok.com",),
+    "instagram": ("instagram.com",),
+    "youtube": ("youtube.com", "youtu.be"),
+}
+
+
+class CollectionSummary(BaseModel):
+    id: uuid.UUID
+    slug: str
+    name: str
+    category: CollectionCategory
+    sub: str
+    description: str
+    cover_hue: str
+    video_count: int
+    is_published: bool
+    updated_at: datetime
+
+
+class CollectionVideoOut(Out):
+    id: uuid.UUID
+    position: int
+    platform: Platform
+    url: str
+    title: str
+    creator_handle: str
+    views: int | None
+    outlier_score: float | None
+    transcript: str
+    notes: str
+
+
+class CollectionDetail(CollectionSummary):
+    breakdown: list[str]
+    videos: list[CollectionVideoOut]
+
+
+class CollectionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", min_length=2, max_length=80)
+    name: str = Field(min_length=2, max_length=120)
+    category: CollectionCategory
+    sub: str = Field(default="", max_length=80)
+    description: str = Field(default="", max_length=2000)
+    breakdown: list[str] = Field(default_factory=list, max_length=20)
+    cover_hue: str = Field(default="", max_length=160)
+    is_published: bool = False
+
+
+class CollectionUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    slug: str | None = Field(default=None, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", min_length=2, max_length=80)
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    category: CollectionCategory | None = None
+    sub: str | None = Field(default=None, max_length=80)
+    description: str | None = Field(default=None, max_length=2000)
+    breakdown: list[str] | None = Field(default=None, max_length=20)
+    cover_hue: str | None = Field(default=None, max_length=160)
+    is_published: bool | None = None
+
+
+class CollectionVideoIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    platform: Platform
+    url: str = Field(max_length=500)
+    title: str = Field(min_length=1, max_length=300)
+    creator_handle: str = Field(default="", max_length=100)
+    views: int | None = Field(default=None, ge=0)
+    outlier_score: float | None = Field(default=None, ge=0)
+    transcript: str = Field(default="", max_length=20_000)
+    notes: str = Field(default="", max_length=2000)
+    position: int | None = Field(default=None, ge=0)
+
+    @field_validator("url")
+    @classmethod
+    def https_platform_url(cls, v: str, info: ValidationInfo) -> str:
+        parsed = urlparse(v)
+        host = (parsed.hostname or "").lower()
+        if parsed.scheme != "https" or not host:
+            raise ValueError("URL must be an https link.")
+        platform = info.data.get("platform")
+        allowed = PLATFORM_HOSTS.get(platform or "", ())
+        if allowed and not any(host == h or host.endswith("." + h) for h in allowed):
+            raise ValueError(f"URL doesn't match platform '{platform}'.")
+        return v
+
+    @field_validator("creator_handle")
+    @classmethod
+    def strip_at(cls, v: str) -> str:
+        return v.strip().lstrip("@")
 
 
 class WaitlistEntryOut(Out):

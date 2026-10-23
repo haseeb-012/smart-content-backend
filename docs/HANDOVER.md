@@ -71,9 +71,11 @@ Make yourself admin after first login: `update public.profiles set is_admin = tr
 - Dashboard: every PRD screen (Dashboard, Videos, Analysis, Channels, Ideas, Hooks, Collections, Scripts, Projects, Exports, Settings ×6, Auth, Onboarding). Live mode wired to Supabase + API for login, workspaces, credits, profile, Stripe test checkout/portal — verified end-to-end (8/8).
 - Backend step 1 (auth, workspaces, plans, credit ledger, admin, audit, waitlist) + step 2 (Stripe test billing). 36 tests.
 
-**Not real yet (still demo data):** video data (Apify), outlier scoring, AI analysis/ideas/scripts (Gemini), hooks library, collections content, social verification, MCP server.
+- Phase 5 step 1: **Collections** live end-to-end (public free API, admin curation, export, dashboard wired). Seed samples with `uv run python -m scripts.seed_collections`.
 
-**Next (in order):** landing waitlist → `POST /api/v1/waitlist`; then Phase 5: Collections → Channels + Apify ingestion + outlier score → Discover → Deep Analysis (Gemini) → Ideas/Hooks/Scripts/Projects/Exports → MCP.
+**Not real yet (still demo data):** video data (Apify), outlier scoring, AI analysis/ideas/scripts (Gemini), hooks library, social verification, MCP server. Collections hold SAMPLE entries until the team curates real ones.
+
+**Next (in order):** Phase 5 step 2: Channels + Apify ingestion + outlier score → Discover → Deep Analysis (Gemini) → Ideas/Hooks/Scripts/Projects/Exports → MCP.
 
 **Read first:** backend `docs/DECISIONS.md` (D1–D15), `docs/STATE.md`, `docs/API_CONTRACTS.md`; each frontend's `docs/STATE.md`.
 

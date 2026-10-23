@@ -34,6 +34,15 @@ All errors: `{"error": {"code": string, "message": string, "details": object}}`
 | POST | `/billing/checkout-session` | 🔒 | `{plan, cycle: monthly\|yearly}` → `{url}` (Stripe-hosted Checkout, test mode). Errors: `billing_unavailable` (409, mock or price not set), `already_subscribed` (409 → use portal) |
 | POST | `/billing/portal-session` | 🔒 | → `{url}` (Stripe Customer Portal). `no_billing_account` (409) if never checked out |
 | POST | `/billing/webhook` | Stripe signature | raw body + `Stripe-Signature` → `{received, duplicate}`. `invalid_signature` / `live_event_rejected` (400) |
+| GET | `/collections?category=&q=&sort=most_videos\|name\|recent` | — (free) | → `CollectionSummary[]` `{id, slug, name, category, sub, description, cover_hue, video_count, is_published, updated_at}` — published only. `category`: `formats\|editing_styles\|visual_hooks\|signature_series` |
+| GET | `/collections/{slug}` | — (free) | → `CollectionDetail` = summary + `breakdown[]` + `videos[]` `{id, position, platform, url, title, creator_handle, views, outlier_score, transcript, notes}`. 404 for drafts |
+| GET | `/collections/{slug}/export?format=markdown\|json` | — (30/min/IP) | → file download (reference sheet) |
+| GET | `/admin/collections` · `/admin/collections/{slug}` | 🔒 admin | includes drafts |
+| POST | `/admin/collections` | 🔒 admin | `{slug, name, category, sub?, description?, breakdown[]?, cover_hue?, is_published?}` → 201 detail · `slug_taken` (409) |
+| PATCH | `/admin/collections/{id}` | 🔒 admin | any of the above → detail (publish/unpublish with `is_published`) |
+| DELETE | `/admin/collections/{id}` | 🔒 admin | → 204 |
+| POST | `/admin/collections/{id}/videos` | 🔒 admin | `{platform, url (https, must match platform), title, creator_handle?, views?, outlier_score?, transcript?, notes?, position?}` → 201 detail · `duplicate_video` (409) |
+| DELETE | `/admin/collections/{id}/videos/{video_id}` | 🔒 admin | → detail |
 | GET | `/admin/users/{id}` | 🔒 admin | → `{profile, credits}` |
 | PATCH | `/admin/users/{id}/plan` | 🔒 admin | `{plan}` → `{profile, credits}` (audited) |
 | POST | `/admin/users/{id}/credits` | 🔒 admin | `{amount, reason}` → `{profile, credits}` (audited) |
