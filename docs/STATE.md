@@ -72,5 +72,12 @@
 - `POST /workspaces/{id}/channels/niche-search` — AI suggestions verified against the platform.
 - 108 tests; ruff + mypy clean. Dashboard + Settings → Social verification + Channels niche tab live (e2e 11/11).
 
+## Done — MCP server
+- `POST /mcp` (Streamable HTTP, stateless) + OAuth protected-resource metadata; Supabase Auth OAuth 2.1 server is the authorization server.
+- 11 tools over the existing services (tenant checks, plan limits, credits unchanged). Per-user tool Allow/Block (`/me/mcp`, migration `0008`).
+- Dashboard: `/oauth/consent` (approve/deny via supabase-js `auth.oauth`), Settings → Connectors live.
+- 115 tests; official MCP Python client check 9/9.
+- To turn on for real: Supabase → Authentication → OAuth Server: enable, authorization path `/oauth/consent` (Site URL = dashboard), allow dynamic client registration; set `PUBLIC_API_URL` to the public backend URL (HTTPS in production); `update profiles set mcp_enabled = true where email = '…'`.
+
 ## Next
-MCP server → final full test with real keys (Supabase, Stripe test, Apify, Gemini).
+Final full test with real keys (Supabase, Stripe test, Apify, Gemini) → deploy.

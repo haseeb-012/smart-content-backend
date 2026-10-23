@@ -77,6 +77,9 @@ All errors: `{"error": {"code": string, "message": string, "details": object}}`
 | POST | `/me/social/{id}/verify` | 🔒 owner (20 s cooldown) | → account (verified; videos import in background) · `code_not_found` (409) · `not_found` (404, bio unreadable) · `conflict` (409, verified by another user) |
 | DELETE | `/me/social/{id}` | 🔒 owner | → 204 |
 | GET | `/me/analytics?days=7\|30\|90` | 🔒 | → `{days, accounts, total_followers, followers_gained (null until 2 snapshots), views, posts, views_by_day[{date,value}], followers_by_day[{date,value}], recent_videos: FeedVideo[]}` — verified accounts only |
+| GET · PATCH | `/me/mcp` | 🔒 | → `{enabled, plan_includes_mcp, server_url, tools: [{name, title, description, permission: allow\|block}]}` · PATCH `{permissions: {tool: allow\|block}}` |
+| GET | `/.well-known/oauth-protected-resource[/mcp]` (no `/api/v1`) | — | RFC 9728 metadata: `{resource, authorization_servers: [<supabase>/auth/v1], scopes_supported, bearer_methods_supported}` |
+| POST | `/mcp` (no `/api/v1`) | Bearer (Supabase OAuth/session JWT) + `mcp` plan feature + `mcp_enabled` | MCP JSON-RPC (Streamable HTTP, JSON responses). 401 + `WWW-Authenticate: Bearer resource_metadata=…` without a token · 403 `mcp_not_enabled`. Tools: channels-search, channels-add, channels-suggest, channels-recap, videos-watchlist, video-suggest, video-details, analyze (1 credit on success), topic, hooks-watchlist, formats-watchlist |
 | GET | `/admin/users/{id}` | 🔒 admin | → `{profile, credits}` |
 | PATCH | `/admin/users/{id}/plan` | 🔒 admin | `{plan}` → `{profile, credits}` (audited) |
 | POST | `/admin/users/{id}/credits` | 🔒 admin | `{amount, reason}` → `{profile, credits}` (audited) |

@@ -546,3 +546,14 @@ class AnalyticsOut(BaseModel):
 class NicheSearchIn(BaseModel):
     description: str = Field(min_length=5, max_length=300)
     platform: Platform | None = None
+
+
+class McpStatus(BaseModel):
+    enabled: bool
+    plan_includes_mcp: bool
+    server_url: str
+    tools: list[dict[str, str]]  # [{name, title, description, permission}]
+
+
+class McpPermissionsIn(BaseModel):
+    permissions: dict[str, Literal["allow", "block"]]

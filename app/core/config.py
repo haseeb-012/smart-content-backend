@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     stripe_price_titan_yearly: str = ""
     # Where Stripe sends the user back to.
     dashboard_url: str = "http://localhost:3001"
+    # Public URL of this API — used in MCP OAuth metadata (the MCP endpoint is {public_api_url}/mcp).
+    public_api_url: str = "http://localhost:8000"
 
     # Channel/video data (behind ChannelProvider). "fake" = deterministic demo data, no network.
     channel_provider: Literal["fake", "apify"] = "fake"

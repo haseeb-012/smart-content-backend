@@ -36,6 +36,8 @@ class Profile(Timestamped, Base):
     plan: Mapped[str] = mapped_column(String(20), default="pro", nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     mcp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # MCP tool permissions: {"tool-name": "allow" | "block"}; missing = allow.
+    mcp_tool_permissions: Mapped[dict[str, str]] = mapped_column(JSON, default=dict, nullable=False)
     # Credits reset on this day-of-month (account anniversary, or Stripe period start later).
     credit_anchor: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     # Billing (Stripe test mode). Plan changes from webhooks write `plan` above.

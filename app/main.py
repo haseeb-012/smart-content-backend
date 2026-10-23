@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.mcp import router as mcp_router
 from app.api.v1 import router as v1
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
     )
     install_error_handlers(app)
     app.include_router(v1)
+    app.include_router(mcp_router)
 
     @app.get("/health", response_model=Health, tags=["health"])
     async def health(db: AsyncSession = Depends(get_db)) -> Health:

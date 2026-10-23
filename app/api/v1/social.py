@@ -14,7 +14,15 @@ from app.models import Channel, Profile, SocialAccount
 from app.modules.discovery_analysis.channels import SessionFactory, sync_channel
 from app.modules.discovery_analysis.providers import ChannelProvider, get_channel_provider
 from app.modules.identity import social as svc
-from app.schemas import AnalyticsOut, ChannelOut, SeriesPoint, SocialAccountOut, SocialStart
+from app.schemas import (
+    AnalyticsOut,
+    ChannelOut,
+    McpPermissionsIn,
+    McpStatus,
+    SeriesPoint,
+    SocialAccountOut,
+    SocialStart,
+)
 
 router = APIRouter(prefix="/me", tags=["social"])
 
@@ -98,3 +106,41 @@ async def analytics(
         followers_by_day=[SeriesPoint(date=p.date, value=p.value) for p in a.followers_by_day],
         recent_videos=[feed_video(v, c) for v, c in a.recent],
     )
+
+
+@router.get("/mcp", response_model=McpStatus)
+async def mcp_status(profile: Profile = Depends(current_profile)):
+    """Connector settings: whether MCP is on for this account, the server URL and tool permissions."""
+    from app.core.config import get_settings
+    from app.modules.mcp.tools import TOOLS
+    from app.modules.plans_credits.plans import limits_for
+
+    perms = profile.mcp_tool_permissions or {}
+    return McpStatus(
+        enabled=profile.mcp_enabled,
+        plan_includes_mcp="mcp" in limits_for(profile.plan).features,
+        server_url=f"{get_settings().public_api_url.rstrip('/')}/mcp",
+        tools=[
+            {
+                "name": t.name,
+                "title": t.title,
+                "description": t.description,
+                "permission": perms.get(t.name, "allow"),
+            }
+            for t in TOOLS
+        ],
+    )
+
+
+@router.patch("/mcp", response_model=McpStatus)
+async def mcp_permissions(
+    body: McpPermissionsIn, profile: Profile = Depends(current_profile), db: AsyncSession = Depends(get_db)
+):
+    from app.modules.mcp.tools import TOOL_NAMES
+
+    unknown = set(body.permissions) - set(TOOL_NAMES)
+    if unknown:
+        raise InvalidParam(f"Unknown tools: {', '.join(sorted(unknown))}")
+    profile.mcp_tool_permissions = {**(profile.mcp_tool_permissions or {}), **body.permissions}
+    await db.commit()
+    return await mcp_status(profile)
