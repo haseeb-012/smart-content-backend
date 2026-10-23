@@ -39,5 +39,17 @@
 - Dashboard Collections pages use the API in live mode (verified e2e: 6/6).
 - 41 tests; ruff + mypy clean.
 
-## Next — Phase 5 step 2: Channels + Apify ingestion + outlier score
-`ChannelProvider` interface + Apify adapters (TikTok/Instagram/YouTube), workspace watchlist API (plan limit 150/250/1000), `videos` table, background refresh job, outlier score = views ÷ median of the channel's previous 30 shorts (≥10 history). Needs `APIFY_TOKEN`.
+## Done — Phase 5 step 2: Channels + ingestion + outlier score + Discover feed
+- Tables `channels` (global, one fetch per creator), `workspace_channels`, `videos` (migration `0004`).
+- `ChannelProvider` interface: `FakeChannelProvider` (default, deterministic demo data) and `ApifyChannelProvider`
+  (TikTok `clockworks~tiktok-scraper`, Instagram `apify~instagram-scraper`, YouTube `streamers~youtube-shorts-scraper`; IDs configurable).
+  ⚠ Apify field mapping is written from the actors' docs and unit-tested with assumed shapes — **verify on the first real run** and adjust `providers.py` mappers if fields differ.
+- Watchlist API: add by URL or handle (validates the account exists), remove, manual refresh (10-min cooldown), plan limit per workspace.
+- Ingestion in a background task: upsert videos, engagement rate, outlier score = views ÷ median(previous 30), needs ≥10 history. Errors are recorded on the channel, never crash the request.
+- Daily refresh: `uv run python -m scripts.refresh_channels [--hours 24]` (schedule with host cron).
+- Discover feed with all PRD filters (AND), 4 sorts, paging. Search (known channels + exact-handle lookup) and suggestions.
+- Never transcribes or AI-analyses scraped videos (only on Deep Analyze — next step).
+- 62 tests; ruff + mypy clean. Dashboard Channels + Videos live (e2e 9/9).
+
+## Next — Phase 5 step 3: Deep Analysis (Gemini)
+Async analysis job (queued → processing → complete), 1 credit charged on success only (idempotent key per workspace+video), Gemini video understanding → transcript, summary, idea, hook, format, visual; idea auto-created; cost cap per user. Needs `GEMINI_API_KEY`. Consider adding Redis + a worker here (master prompt: Celery when analysis starts).

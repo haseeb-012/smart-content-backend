@@ -43,6 +43,13 @@ All errors: `{"error": {"code": string, "message": string, "details": object}}`
 | DELETE | `/admin/collections/{id}` | 🔒 admin | → 204 |
 | POST | `/admin/collections/{id}/videos` | 🔒 admin | `{platform, url (https, must match platform), title, creator_handle?, views?, outlier_score?, transcript?, notes?, position?}` → 201 detail · `duplicate_video` (409) |
 | DELETE | `/admin/collections/{id}/videos/{video_id}` | 🔒 admin | → detail |
+| GET | `/workspaces/{id}/channels` | 🔒 member | → `WatchlistItem[]` = Channel + `{outlier_videos (≥5x), added_at}`. Channel: `{id, platform, handle, display_name, avatar_url, followers, total_views, video_count, sync_status: pending\|ok\|error, sync_error, last_synced_at}` |
+| POST | `/workspaces/{id}/channels` | 🔒 owner/editor | `{url}` or `{platform, handle}` → 201 `{channel, added:true}` (first sync runs in background) · 200 `{added:false}` if already tracked · `invalid_channel` (422) · `channel_not_found` (404) · `plan_limit` (403, `resource: channels`) |
+| DELETE | `/workspaces/{id}/channels/{channel_id}` | 🔒 owner/editor | → 204 |
+| POST | `/workspaces/{id}/channels/{channel_id}/refresh` | 🔒 owner/editor | → 202 `{queued}` · `rate_limited` (429) within 10 min of last sync |
+| GET | `/workspaces/{id}/channels/suggested` | 🔒 member | → `Channel[]` (most-tracked elsewhere, not in this workspace) |
+| GET | `/workspaces/{id}/channels/search?q=&platform=` | 🔒 member (30/min) | → `{platform, handle, display_name, followers, channel_id (null = not stored yet), tracked}[]` |
+| GET | `/workspaces/{id}/videos?channel_id=…&platform=&min_outlier=&min_views=&max_views=&min_engagement=&posted_within_days=&q=&sort=outlier\|views\|engagement\|newest&limit=48&offset=0` | 🔒 member | → `{items: FeedVideo[], total, limit, offset}`. FeedVideo: `{id, platform, url, caption, thumbnail_url, posted_at, duration_sec, views, likes, comments, shares, engagement_rate, outlier_score, channel}`. Filters AND together. Free |
 | GET | `/admin/users/{id}` | 🔒 admin | → `{profile, credits}` |
 | PATCH | `/admin/users/{id}/plan` | 🔒 admin | `{plan}` → `{profile, credits}` (audited) |
 | POST | `/admin/users/{id}/credits` | 🔒 admin | `{amount, reason}` → `{profile, credits}` (audited) |

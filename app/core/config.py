@@ -44,6 +44,17 @@ class Settings(BaseSettings):
     # Where Stripe sends the user back to.
     dashboard_url: str = "http://localhost:3001"
 
+    # Channel/video data (behind ChannelProvider). "fake" = deterministic demo data, no network.
+    channel_provider: Literal["fake", "apify"] = "fake"
+    apify_token: str = ""
+    # Apify actor IDs per platform — configurable because public actors change over time.
+    apify_actor_tiktok: str = "clockworks~tiktok-scraper"
+    apify_actor_instagram: str = "apify~instagram-scraper"
+    apify_actor_youtube: str = "streamers~youtube-shorts-scraper"
+    apify_timeout_seconds: int = 180
+    # How many recent videos to pull per channel on each sync (outlier baseline needs ≥ 31).
+    ingest_videos_per_channel: int = 60
+
     llm_provider: Literal["gemini", "mock"] = "gemini"
     gemini_api_key: str = ""
 
@@ -62,6 +73,8 @@ class Settings(BaseSettings):
     def require_auth_config(self) -> "Settings":
         if self.env in ("staging", "production") and not self.supabase_url:
             raise ValueError("SUPABASE_URL is required outside local/test.")
+        if self.channel_provider == "apify" and not self.apify_token:
+            raise ValueError("CHANNEL_PROVIDER=apify needs APIFY_TOKEN.")
         if self.billing_provider == "stripe_test":
             if not self.stripe_secret_key.startswith(("sk_test_", "rk_test_")):
                 raise ValueError("BILLING_PROVIDER=stripe_test needs a test key (rk_test_… or sk_test_…).")

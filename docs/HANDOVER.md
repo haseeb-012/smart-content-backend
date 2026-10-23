@@ -73,9 +73,13 @@ Make yourself admin after first login: `update public.profiles set is_admin = tr
 
 - Phase 5 step 1: **Collections** live end-to-end (public free API, admin curation, export, dashboard wired). Seed samples with `uv run python -m scripts.seed_collections`.
 
-**Not real yet (still demo data):** video data (Apify), outlier scoring, AI analysis/ideas/scripts (Gemini), hooks library, social verification, MCP server. Collections hold SAMPLE entries until the team curates real ones.
+- Phase 5 step 2: **Channels watchlist + video ingestion + outlier score + Discover feed** live end-to-end (fake provider by default; Apify adapter ready — set `CHANNEL_PROVIDER=apify` + `APIFY_TOKEN`, then verify field mapping on the first run).
 
-**Next (in order):** Phase 5 step 2: Channels + Apify ingestion + outlier score → Discover → Deep Analysis (Gemini) → Ideas/Hooks/Scripts/Projects/Exports → MCP.
+**Not real yet (still demo data):** AI analysis/ideas/scripts (Gemini), hooks library, dashboard analytics, social verification, MCP server. Collections hold SAMPLE entries until the team curates real ones. Real creator data needs an Apify token.
+
+**Next (in order):** Phase 5 step 3: Deep Analysis (Gemini) → Ideas/Hooks/Scripts/Projects/Exports → MCP.
+
+**Local env files** (gitignored, already created on the original machine — recreate from `.env.example` elsewhere): backend `.env`, dashboard `.env.local`, landing `.env.local`.
 
 **Read first:** backend `docs/DECISIONS.md` (D1–D15), `docs/STATE.md`, `docs/API_CONTRACTS.md`; each frontend's `docs/STATE.md`.
 

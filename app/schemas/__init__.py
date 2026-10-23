@@ -232,6 +232,72 @@ class CollectionVideoIn(BaseModel):
         return v.strip().lstrip("@")
 
 
+class ChannelOut(Out):
+    id: uuid.UUID
+    platform: Platform
+    handle: str
+    display_name: str
+    avatar_url: str | None
+    followers: int | None
+    total_views: int | None
+    video_count: int
+    sync_status: Literal["pending", "ok", "error"]
+    sync_error: str | None
+    last_synced_at: datetime | None
+
+
+class WatchlistItem(ChannelOut):
+    outlier_videos: int
+    added_at: datetime
+
+
+class ChannelAdd(BaseModel):
+    """Add by URL, or by platform + handle (FR-CH-01)."""
+
+    model_config = ConfigDict(extra="forbid")
+    url: str | None = Field(default=None, max_length=500)
+    platform: Platform | None = None
+    handle: str | None = Field(default=None, max_length=100)
+
+
+class ChannelAddResult(BaseModel):
+    channel: ChannelOut
+    added: bool
+
+
+class ChannelSearchResult(BaseModel):
+    platform: Platform
+    handle: str
+    display_name: str
+    followers: int | None
+    channel_id: uuid.UUID | None  # None = found on the platform but not stored yet
+    tracked: bool
+
+
+class FeedVideo(BaseModel):
+    id: uuid.UUID
+    platform: Platform
+    url: str
+    caption: str
+    thumbnail_url: str | None
+    posted_at: datetime | None
+    duration_sec: int | None
+    views: int
+    likes: int
+    comments: int
+    shares: int
+    engagement_rate: float
+    outlier_score: float | None
+    channel: ChannelOut
+
+
+class FeedPage(BaseModel):
+    items: list[FeedVideo]
+    total: int
+    limit: int
+    offset: int
+
+
 class WaitlistEntryOut(Out):
     email: str
     plan: str

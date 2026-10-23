@@ -117,6 +117,70 @@ class StripeEvent(Timestamped, Base):
     type: Mapped[str] = mapped_column(String(80), nullable=False)
 
 
+class Channel(Timestamped, Base):
+    """A creator account on one platform. Global (shared across workspaces) so each channel is
+    fetched once no matter how many workspaces track it."""
+
+    __tablename__ = "channels"
+    __table_args__ = (UniqueConstraint("platform", "handle", name="uq_channels_platform_handle"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    platform: Mapped[str] = mapped_column(String(16), nullable=False)  # tiktok | instagram | youtube
+    handle: Mapped[str] = mapped_column(String(100), nullable=False)  # lowercase, no @
+    external_id: Mapped[str | None] = mapped_column(String(100))
+    display_name: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    avatar_url: Mapped[str | None] = mapped_column(String(1000))
+    followers: Mapped[int | None] = mapped_column(BigInteger)
+    total_views: Mapped[int | None] = mapped_column(BigInteger)
+    video_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sync_status: Mapped[str] = mapped_column(
+        String(16), default="pending", nullable=False
+    )  # pending|ok|error
+    sync_error: Mapped[str | None] = mapped_column(String(300))
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WorkspaceChannel(Timestamped, Base):
+    """A channel on a workspace's watchlist (FR-CH-02). Plan limits the count (FR-CH-04)."""
+
+    __tablename__ = "workspace_channels"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "channel_id", name="uq_workspace_channels_ws_channel"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    channel_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("channels.id", ondelete="CASCADE"), index=True)
+    added_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("profiles.id", ondelete="SET NULL"))
+
+
+class Video(Timestamped, Base):
+    """A short-form video from a tracked channel. `outlier_score` = views ÷ median views of the
+    channel's previous 30 videos (needs ≥ 10 earlier videos, else NULL)."""
+
+    __tablename__ = "videos"
+    __table_args__ = (UniqueConstraint("platform", "external_id", name="uq_videos_platform_external_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    channel_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("channels.id", ondelete="CASCADE"), index=True)
+    platform: Mapped[str] = mapped_column(String(16), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    caption: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(1000))
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    duration_sec: Mapped[int | None] = mapped_column(Integer)
+    views: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    likes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    comments: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    shares: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    engagement_rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)  # percent
+    outlier_score: Mapped[float | None] = mapped_column(Float, index=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
 class Collection(Timestamped, Base):
     """Team-curated group of outlier videos sharing one pattern (PRD §9.10). Free for everyone.
     Users can't create their own in v1 (FR-COL-07) — only admins write."""
