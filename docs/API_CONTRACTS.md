@@ -55,6 +55,23 @@ All errors: `{"error": {"code": string, "message": string, "details": object}}`
 | GET | `/workspaces/{id}/ideas?shortlisted=` | 🔒 member | → `Idea[]` `{id, video_id, analysis_id, source: analysis\|generated\|manual, title, positioning, format, contrast, personalization, shortlisted, created_at}` |
 | PATCH | `/workspaces/{id}/ideas/{idea_id}` | 🔒 owner/editor | `{shortlisted?, title?}` → Idea |
 | DELETE | `/workspaces/{id}/ideas/{idea_id}` | 🔒 owner/editor | → 204 |
+| POST | `/workspaces/{id}/ideas/generate` | 🔒 owner/editor (free, 60/h) | `{topic, count 1–10}` → 201 `Idea[]` (source=generated) |
+| GET | `/hooks?category=&niche=&q=` | — (free) | → `Hook[]` `{id, text, category, niche, views, source_url}` (published library) |
+| POST · DELETE | `/admin/hooks` · `/admin/hooks/{id}` | 🔒 admin | `{text, category, niche?, views?, source_url?, is_published?}` (audited) |
+| POST | `/workspaces/{id}/hooks/generate` | 🔒 member (free, 60/h) | `{topic, category?, count 5–50}` → `{text, category}[]` (not stored) |
+| GET · POST | `/workspaces/{id}/saved-hooks` | 🔒 member · owner/editor | `{text, category?, source: library\|generator\|analysis\|manual}` → 201 new / 200 already saved |
+| DELETE | `/workspaces/{id}/saved-hooks/{hook_id}` | 🔒 owner/editor | → 204 |
+| GET | `/workspaces/{id}/scripts` | 🔒 member | → `ScriptSummary[]` `{id, title, topic, hook, expanded, version_count, source_video_id, source_idea_id, created_at, updated_at}` |
+| POST | `/workspaces/{id}/scripts` | 🔒 owner/editor (10/min) | header `Idempotency-Key` (recommended) · `{title, topic, hook?, source_video_id?, source_idea_id?}` → 201 `Script` (summary + `blocks{hook,intro,main,story,cta,ending}` + `versions[]`) · 200 on same-key replay. **1 credit, only on success.** `credits_exhausted` (402) · `provider_error` (502, nothing charged) |
+| GET · PATCH · DELETE | `/workspaces/{id}/scripts/{script_id}` | 🔒 member · owner/editor | PATCH `{title?, blocks?}` → new version (last 20 kept), free |
+| POST | `/workspaces/{id}/scripts/{script_id}/expand` | 🔒 owner/editor (free, 60/h) | → Script (`expanded: true`) |
+| POST | `/workspaces/{id}/scripts/{script_id}/versions/{version_id}/restore` | 🔒 owner/editor | → Script |
+| GET | `/workspaces/{id}/scripts/{script_id}/export?format=markdown\|json\|text` | 🔒 member | → file download (logged in export history) |
+| GET · POST | `/workspaces/{id}/projects` | 🔒 member · owner/editor | `{name, description?}` → `Project` `{id, name, description, created_at, items: [{kind, ref_id, title, subtitle, thumbnail_url, platform, added_at}]}` |
+| GET · PATCH · DELETE | `/workspaces/{id}/projects/{project_id}` | 🔒 member · owner/editor | delete keeps the items in the workspace |
+| POST | `/workspaces/{id}/projects/{project_id}/items` | 🔒 owner/editor | `{kind: video\|idea\|script, ref_id}` → Project (moves the item if it was in another project) |
+| DELETE | `/workspaces/{id}/projects/{project_id}/items/{kind}/{ref_id}` | 🔒 owner/editor | → Project |
+| GET · POST | `/workspaces/{id}/exports` | 🔒 member | `{kind, title, format}` → 201 `{id, kind, title, format, created_at}` (export history) |
 | GET | `/admin/users/{id}` | 🔒 admin | → `{profile, credits}` |
 | PATCH | `/admin/users/{id}/plan` | 🔒 admin | `{plan}` → `{profile, credits}` (audited) |
 | POST | `/admin/users/{id}/credits` | 🔒 admin | `{amount, reason}` → `{profile, credits}` (audited) |

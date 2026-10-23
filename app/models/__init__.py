@@ -246,6 +246,136 @@ class Idea(Timestamped, Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("profiles.id", ondelete="SET NULL"))
 
 
+class HookTemplate(Timestamped, Base):
+    """Global, team-curated hook library (PRD §9.8). Free for everyone; only admins write."""
+
+    __tablename__ = "hook_library"
+    __table_args__ = (UniqueConstraint("text", name="uq_hook_library_text"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    text: Mapped[str] = mapped_column(String(300), nullable=False)
+    # contrarian | curiosity_gap | question | unexpected_claim | problem
+    category: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    niche: Mapped[str] = mapped_column(String(60), default="General", nullable=False)
+    views: Mapped[int | None] = mapped_column(BigInteger)
+    source_url: Mapped[str | None] = mapped_column(String(500))
+    is_published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+class SavedHook(Timestamped, Base):
+    """A hook on a workspace's hook watchlist (usable in the script editor)."""
+
+    __tablename__ = "saved_hooks"
+    __table_args__ = (UniqueConstraint("workspace_id", "text", name="uq_saved_hooks_ws_text"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    text: Mapped[str] = mapped_column(String(300), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(32))
+    source: Mapped[str] = mapped_column(
+        String(16), default="library", nullable=False
+    )  # library|generator|analysis|manual
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("profiles.id", ondelete="SET NULL"))
+
+
+class Script(Timestamped, Base):
+    """A short-form script (PRD §9.9): hook, intro, main, story, cta, ending. Every save is a version."""
+
+    __tablename__ = "scripts"
+    # Client-sent Idempotency-Key: a retried "Generate" returns the same script, charged once.
+    __table_args__ = (UniqueConstraint("workspace_id", "request_key", name="uq_scripts_ws_request_key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    topic: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    blocks: Mapped[dict[str, str]] = mapped_column(JSON, default=dict, nullable=False)
+    expanded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    request_key: Mapped[str | None] = mapped_column(String(80))
+    source_video_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("videos.id", ondelete="SET NULL"))
+    source_idea_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ideas.id", ondelete="SET NULL"))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("profiles.id", ondelete="SET NULL"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+    versions: Mapped[list["ScriptVersion"]] = relationship(
+        back_populates="script",
+        cascade="all, delete-orphan",
+        order_by="ScriptVersion.created_at.desc()",
+    )
+
+
+class ScriptVersion(Timestamped, Base):
+    __tablename__ = "script_versions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    script_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scripts.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    blocks: Mapped[dict[str, str]] = mapped_column(JSON, default=dict, nullable=False)
+    note: Mapped[str] = mapped_column(
+        String(32), default="edit", nullable=False
+    )  # generated|edit|expand|restore
+
+    script: Mapped[Script] = relationship(back_populates="versions")
+
+
+class Project(Timestamped, Base):
+    """A folder grouping videos, ideas and scripts for one piece of content (PRD §9.11)."""
+
+    __tablename__ = "projects"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("profiles.id", ondelete="SET NULL"))
+
+    items: Mapped[list["ProjectItem"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan", order_by="ProjectItem.created_at"
+    )
+
+
+class ProjectItem(Timestamped, Base):
+    """An item lives in at most one project per workspace (adding it elsewhere moves it)."""
+
+    __tablename__ = "project_items"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "kind", "ref_id", name="uq_project_items_ws_kind_ref"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # video | idea | script
+    ref_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+
+    project: Mapped[Project] = relationship(back_populates="items")
+
+
+class ExportRecord(Timestamped, Base):
+    """Export history (PRD §9.12). Files are built on demand; this only records what was exported."""
+
+    __tablename__ = "exports"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    format: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("profiles.id", ondelete="SET NULL"))
+
+
 class Collection(Timestamped, Base):
     """Team-curated group of outlier videos sharing one pattern (PRD §9.10). Free for everyone.
     Users can't create their own in v1 (FR-COL-07) — only admins write."""

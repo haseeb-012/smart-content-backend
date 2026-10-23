@@ -70,12 +70,57 @@ class AnalysisResult(BaseModel):
     idea_draft: IdeaDraft
 
 
+BLOCK_KEYS = ("hook", "intro", "main", "story", "cta", "ending")
+
+
+class ScriptBlocks(BaseModel):
+    hook: str = Field(max_length=1000)
+    intro: str = Field(max_length=2000)
+    main: str = Field(max_length=6000)
+    story: str = Field(max_length=3000)
+    cta: str = Field(max_length=1000)
+    ending: str = Field(max_length=1000)
+
+
+class HookDraft(BaseModel):
+    text: str = Field(max_length=300)
+    category: HookCategory = "other"
+
+
+class HookList(BaseModel):
+    hooks: list[HookDraft] = Field(max_length=60)
+
+
+class IdeaList(BaseModel):
+    ideas: list[IdeaDraft] = Field(max_length=20)
+
+
+class NicheMatches(BaseModel):
+    handles: list[str] = Field(max_length=20)
+
+
 class LLMProvider(Protocol):
     name: str
     model: str
 
     async def analyze_video(self, ctx: VideoContext) -> AnalysisResult:
         """Watch the video and return the structured breakdown. Raise ProviderError on failure."""
+        ...
+
+    async def write_script(self, topic: str, hook: str | None, context: str | None) -> ScriptBlocks:
+        """Draft a short-form script in six blocks."""
+        ...
+
+    async def expand_script(self, blocks: ScriptBlocks) -> ScriptBlocks:
+        """Make the intro/main/story richer while keeping the creator's wording."""
+        ...
+
+    async def generate_hooks(self, topic: str, category: str | None, count: int) -> list[HookDraft]: ...
+
+    async def generate_ideas(self, topic: str, count: int, context: str | None) -> list[IdeaDraft]: ...
+
+    async def suggest_creators(self, description: str, platform: str | None) -> list[str]:
+        """Creator handles (no @) likely to match a niche description. Verified by the caller."""
         ...
 
 
@@ -129,6 +174,94 @@ class FakeLLMProvider:
                 personalization="Use a result from your own work as the proof point.",
             ),
         )
+
+    async def write_script(self, topic: str, hook: str | None, context: str | None) -> ScriptBlocks:
+        t = topic.strip().rstrip(".") or "your topic"
+        if "failscript" in t.lower():
+            raise ProviderError("The AI couldn't write this script. No credit was charged.")
+        return ScriptBlocks(
+            hook=hook or f"Nobody tells you this about {t.lower()}…",
+            intro="I studied the top outliers in my niche this month, and they all do one thing differently.",
+            main=(
+                "First, they open on a claim, not a greeting. Second, every beat is under eight seconds. "
+                "Third, they pay off the promise before the viewer can scroll."
+            ),
+            story=(
+                "When I tried this on my last video, my average watch time went up and the comments asked "
+                "for part two." + (f" (Inspired by: {context[:120]})" if context else "")
+            ),
+            cta="Follow so you don't miss part two.",
+            ending="Try it on your next video and tell me how it goes.",
+        )
+
+    async def expand_script(self, blocks: ScriptBlocks) -> ScriptBlocks:
+        return blocks.model_copy(
+            update={
+                "intro": f"{blocks.intro} I'll show you exactly what to change, step by step.",
+                "main": (
+                    f"{blocks.main} Here's an example: instead of opening with a greeting, start with the "
+                    "result. Then show the proof on screen while you explain the first step."
+                ),
+                "story": f"{blocks.story} The surprising part: it took less effort, not more.",
+            }
+        )
+
+    async def generate_hooks(self, topic: str, category: str | None, count: int) -> list[HookDraft]:
+        t = topic.strip() or "your niche"
+        tpl: list[tuple[HookCategory, str]] = [
+            ("contrarian", "Stop doing {x} the way everyone tells you to"),
+            ("contrarian", "{X} is overrated — here's what works instead"),
+            ("curiosity_gap", "The one thing about {x} nobody talks about"),
+            ("curiosity_gap", "I tried {x} for 30 days. Day 12 changed everything"),
+            ("question", "Why does nobody explain {x} like this?"),
+            ("question", "What if {x} is easier than you think?"),
+            ("unexpected_claim", "{X} took me 10 minutes, not 10 hours"),
+            ("unexpected_claim", "The cheapest way to get better at {x} is free"),
+            ("problem", "If {x} isn't working for you, it's probably this"),
+            ("problem", "The mistake that's killing your {x} results"),
+        ]
+        pool = [(c, line) for c, line in tpl if not category or category == c] or tpl
+        extras = [
+            "",
+            " (in 30 seconds)",
+            " — the honest version",
+            " before it's too late",
+            " (from someone who failed first)",
+        ]
+        out: list[HookDraft] = []
+        for i in range(len(pool) * len(extras)):
+            c, line = pool[i % len(pool)]
+            text = (
+                line.replace("{x}", t.lower()).replace("{X}", t[:1].upper() + t[1:]) + extras[i // len(pool)]
+            )
+            out.append(HookDraft(text=text, category=c))
+            if len(out) >= count:
+                break
+        return out
+
+    async def generate_ideas(self, topic: str, count: int, context: str | None) -> list[IdeaDraft]:
+        t = topic.strip() or "your niche"
+        angles = [
+            ("Myth vs fact", "Bust the most common belief", "Myth first, then the evidence."),
+            ("Before / after", "Show the transformation", "Start with the 'after', rewind to the 'before'."),
+            ("Listicle countdown", "3 things I'd do differently", "Count down to the most surprising one."),
+            ("Case study", "Break down one real example", "Result first, then how it happened."),
+            ("Day in the life", "Behind the scenes", "Real moments, captions explain the lesson."),
+        ]
+        return [
+            IdeaDraft(
+                title=f"{a[1]}: {t}",
+                positioning="Speak as someone a few steps ahead of the viewer.",
+                format=a[0],
+                contrast=a[2],
+                personalization="Use one number from your own results and one mistake you made.",
+            )
+            for a in (angles * 4)[:count]
+        ]
+
+    async def suggest_creators(self, description: str, platform: str | None) -> list[str]:
+        words = [w.strip(".,!?").lower() for w in description.split() if len(w) > 3]
+        return [f"{w}.daily" for w in words[:3]] + [f"the{w}coach" for w in words[:2]]
 
 
 # ------------------------------------------------------------------------------------------ media safety
@@ -285,15 +418,42 @@ def extract_output_text(data: dict[str, Any]) -> str:
     return "".join(texts).strip()
 
 
-def parse_result(text: str) -> AnalysisResult:
+def parse_json[T: BaseModel](text: str, model: type[T]) -> T:
     raw = text.strip()
     if raw.startswith("```"):
         raw = raw.strip("`").removeprefix("json").strip()
     try:
-        return AnalysisResult.model_validate(json.loads(raw))
+        return model.model_validate(json.loads(raw))
     except (json.JSONDecodeError, ValidationError) as e:
-        log.warning("gemini returned unparseable analysis: %s", str(e)[:300])
-        raise ProviderError("The AI returned an incomplete analysis. No credit was charged.") from e
+        log.warning("gemini returned unparseable %s: %s", model.__name__, str(e)[:300])
+        raise ProviderError("The AI returned an incomplete answer. No credit was charged.") from e
+
+
+def parse_result(text: str) -> AnalysisResult:
+    return parse_json(text, AnalysisResult)
+
+
+def _obj(props: dict[str, Any]) -> dict[str, Any]:
+    return {"type": "object", "properties": props, "required": list(props)}
+
+
+_STR: dict[str, Any] = {"type": "string"}
+SCRIPT_SCHEMA = _obj({k: _STR for k in BLOCK_KEYS})
+HOOKS_SCHEMA = _obj(
+    {
+        "hooks": {
+            "type": "array",
+            "items": _obj({"text": _STR, "category": ANALYSIS_SCHEMA["properties"]["hook_category"]}),
+        }
+    }
+)
+IDEAS_SCHEMA = _obj({"ideas": {"type": "array", "items": ANALYSIS_SCHEMA["properties"]["idea_draft"]}})
+NICHE_SCHEMA = _obj({"handles": {"type": "array", "items": _STR}})
+SCRIPT_RULES = (
+    "Blocks: hook (first 1-3 seconds, a promise), intro (why keep watching), main (the beats that deliver "
+    "the promise), story (a moment, result or example), cta (one clear ask), ending (close the loop). "
+    "Spoken, short sentences, no stage directions, no hashtags. Never copy another creator's script."
+)
 
 
 class GeminiLLMProvider:
@@ -323,18 +483,12 @@ class GeminiLLMProvider:
         )
         return {"type": "video", "data": base64.b64encode(data).decode(), "mime_type": mime}
 
-    async def analyze_video(self, ctx: VideoContext) -> AnalysisResult:
-        prompt = PROMPT.format(
-            platform=ctx.platform,
-            handle=ctx.creator_handle,
-            views=f"{ctx.views:,}",
-            outlier=f", {ctx.outlier_score}x the creator's median" if ctx.outlier_score else "",
-            caption=ctx.caption[:1500],
-        )
+    async def _call(self, parts: list[dict[str, Any]] | str, schema: dict[str, Any]) -> str:
+        """One Interactions request with a JSON-schema answer. Returns the model's text."""
         body = {
             "model": self.model,
-            "input": [await self._video_part(ctx), {"type": "text", "text": prompt}],
-            "response_format": {"type": "text", "mime_type": "application/json", "schema": ANALYSIS_SCHEMA},
+            "input": parts,
+            "response_format": {"type": "text", "mime_type": "application/json", "schema": schema},
         }
         try:
             r = await self.client.post(f"{self.BASE}/interactions", json=body, headers=self._headers())
@@ -366,8 +520,64 @@ class GeminiLLMProvider:
             raise ProviderError(msg)
         if data.get("status") in ("failed", "cancelled", "incomplete"):
             log.warning("gemini interaction %s: %s", data.get("status"), str(data.get("errors"))[:300])
-            raise ProviderError("The AI couldn't finish this analysis. No credit was charged.")
-        return parse_result(extract_output_text(data))
+            raise ProviderError("The AI couldn't finish this request. No credit was charged.")
+        return extract_output_text(data)
+
+    async def analyze_video(self, ctx: VideoContext) -> AnalysisResult:
+        prompt = PROMPT.format(
+            platform=ctx.platform,
+            handle=ctx.creator_handle,
+            views=f"{ctx.views:,}",
+            outlier=f", {ctx.outlier_score}x the creator's median" if ctx.outlier_score else "",
+            caption=ctx.caption[:1500],
+        )
+        text = await self._call(
+            [await self._video_part(ctx), {"type": "text", "text": prompt}], ANALYSIS_SCHEMA
+        )
+        return parse_result(text)
+
+    async def write_script(self, topic: str, hook: str | None, context: str | None) -> ScriptBlocks:
+        prompt = (
+            f"Write a short-form video script (30-60 seconds) about: {topic[:500]!r}.\n"
+            + (f"Use exactly this hook: {hook[:300]!r}.\n" if hook else "")
+            + (f"Inspiration (structure only, don't copy): {context[:1500]!r}.\n" if context else "")
+            + SCRIPT_RULES
+        )
+        return parse_json(await self._call(prompt, SCRIPT_SCHEMA), ScriptBlocks)
+
+    async def expand_script(self, blocks: ScriptBlocks) -> ScriptBlocks:
+        prompt = (
+            "Expand this short-form script: make intro, main and story more detailed and concrete (about "
+            "1.5x longer), keep hook, cta and ending unless they are unclear. Keep the creator's voice.\n"
+            f"{blocks.model_dump_json()}\n{SCRIPT_RULES}"
+        )
+        return parse_json(await self._call(prompt, SCRIPT_SCHEMA), ScriptBlocks)
+
+    async def generate_hooks(self, topic: str, category: str | None, count: int) -> list[HookDraft]:
+        prompt = (
+            f"Write {count} distinct scroll-stopping opening lines for short-form videos about {topic[:300]!r}"
+            + (f", all of category {category}" if category else "")
+            + ". Max 15 words each, no emojis, no hashtags, no clickbait lies."
+        )
+        return parse_json(await self._call(prompt, HOOKS_SCHEMA), HookList).hooks[:count]
+
+    async def generate_ideas(self, topic: str, count: int, context: str | None) -> list[IdeaDraft]:
+        prompt = (
+            f"Give {count} original short-form video ideas for a creator in the niche {topic[:300]!r}."
+            + (f" Their recent outliers for context: {context[:1500]!r}." if context else "")
+            + " For each: title, positioning, format, contrast (what to do differently), personalization."
+        )
+        return parse_json(await self._call(prompt, IDEAS_SCHEMA), IdeaList).ideas[:count]
+
+    async def suggest_creators(self, description: str, platform: str | None) -> list[str]:
+        where = f" on {platform}" if platform else ""
+        prompt = (
+            f"List up to 10 real, currently active short-form creators{where} who match this niche: "
+            f"{description[:300]!r}. Return only their exact handles without @. "
+            "If unsure a handle exists, leave it out."
+        )
+        handles = parse_json(await self._call(prompt, NICHE_SCHEMA), NicheMatches).handles
+        return [h.strip().lstrip("@").lower() for h in handles if h.strip()][:10]
 
 
 @lru_cache

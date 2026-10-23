@@ -9,6 +9,7 @@ from app.api.v1 import (
     credits,
     me,
     plans,
+    studio,
     waitlist,
     workspaces,
 )
@@ -16,6 +17,8 @@ from app.api.v1 import (
 router = APIRouter(prefix="/api/v1")
 router.include_router(channels.router)
 router.include_router(analysis.router)
+router.include_router(studio.router)
+router.include_router(studio.admin_router)
 router.include_router(collections.router)
 router.include_router(collections.admin_router)
 router.include_router(billing.router)

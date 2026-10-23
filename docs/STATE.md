@@ -60,5 +60,12 @@
 - Ideas API: list (filter shortlisted), shortlist/rename, delete.
 - 81 tests; ruff + mypy clean. Dashboard video page live (cards → analysis screen with polling).
 
+## Done — Create module (Ideas generator, Hooks, Scripts, Projects, Exports)
+- Tables `hook_library`, `saved_hooks`, `scripts` + `script_versions`, `projects` + `project_items`, `exports` (migration `0006`).
+- `LLMProvider` gained `write_script`, `expand_script`, `generate_hooks`, `generate_ideas`, `suggest_creators` (fake + Gemini).
+- Scripts: 1 credit on success, idempotent via `Idempotency-Key`; edit → version; expand free; restore; export md/json/txt.
+- `uv run python -m scripts.seed_hooks` seeds 16 SAMPLE hooks.
+- 97 tests; ruff + mypy clean.
+
 ## Next
-Ideas page + idea generator → Hooks → Scripts → Projects/Exports → dashboard stats → social verification → MCP. Celery/Redis still deferred: analyses are single background tasks with a stale-run guard (15 min).
+Wire dashboard Ideas/Hooks/Scripts/Projects/Exports to the API → social verification + own-account analytics (Dashboard) → niche search → MCP.

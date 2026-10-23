@@ -355,3 +355,154 @@ class WaitlistEntryOut(Out):
     plan: str
     source: str
     created_at: datetime
+
+
+# ------------------------------------------------------------------ Create module (hooks, scripts, projects, exports)
+
+HookCategory = Literal["contrarian", "curiosity_gap", "question", "unexpected_claim", "problem", "other"]
+
+
+class HookOut(Out):
+    id: uuid.UUID
+    text: str
+    category: str
+    niche: str
+    views: int | None
+    source_url: str | None
+
+
+class HookIn(BaseModel):
+    text: str = Field(min_length=3, max_length=300)
+    category: HookCategory
+    niche: str = Field(default="General", min_length=1, max_length=60)
+    views: int | None = Field(default=None, ge=0)
+    source_url: str | None = Field(default=None, max_length=500)
+    is_published: bool = True
+
+
+class SavedHookIn(BaseModel):
+    text: str = Field(min_length=3, max_length=300)
+    category: HookCategory | None = None
+    source: Literal["library", "generator", "analysis", "manual"] = "manual"
+
+
+class SavedHookOut(Out):
+    id: uuid.UUID
+    text: str
+    category: str | None
+    source: str
+    created_at: datetime
+
+
+class HookGenerateIn(BaseModel):
+    topic: str = Field(min_length=2, max_length=200)
+    category: HookCategory | None = None
+    count: int = Field(default=20, ge=5, le=50)
+
+
+class GeneratedHook(BaseModel):
+    text: str
+    category: str
+
+
+class IdeaGenerateIn(BaseModel):
+    topic: str = Field(min_length=2, max_length=200)
+    count: int = Field(default=5, ge=1, le=10)
+
+
+class BlocksIO(BaseModel):
+    hook: str = Field(default="", max_length=1000)
+    intro: str = Field(default="", max_length=2000)
+    main: str = Field(default="", max_length=6000)
+    story: str = Field(default="", max_length=3000)
+    cta: str = Field(default="", max_length=1000)
+    ending: str = Field(default="", max_length=1000)
+
+
+class ScriptCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    topic: str = Field(min_length=1, max_length=500)
+    hook: str | None = Field(default=None, max_length=300)
+    source_video_id: uuid.UUID | None = None
+    source_idea_id: uuid.UUID | None = None
+
+
+class ScriptUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    blocks: BlocksIO | None = None
+
+
+class ScriptVersionOut(Out):
+    id: uuid.UUID
+    title: str
+    blocks: BlocksIO
+    note: str
+    created_at: datetime
+
+
+class ScriptSummary(BaseModel):
+    id: uuid.UUID
+    title: str
+    topic: str
+    hook: str
+    expanded: bool
+    version_count: int
+    source_video_id: uuid.UUID | None
+    source_idea_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ScriptOut(ScriptSummary):
+    blocks: BlocksIO
+    versions: list[ScriptVersionOut]
+
+
+ItemKind = Literal["video", "idea", "script"]
+
+
+class ProjectIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=1000)
+
+
+class ProjectPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=1000)
+
+
+class ProjectItemIn(BaseModel):
+    kind: ItemKind
+    ref_id: uuid.UUID
+
+
+class ProjectItemOut(BaseModel):
+    kind: ItemKind
+    ref_id: uuid.UUID
+    title: str
+    subtitle: str
+    thumbnail_url: str | None = None
+    platform: Platform | None = None
+    added_at: datetime
+
+
+class ProjectOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: str
+    created_at: datetime
+    items: list[ProjectItemOut]
+
+
+class ExportIn(BaseModel):
+    kind: str = Field(min_length=1, max_length=32)
+    title: str = Field(min_length=1, max_length=200)
+    format: str = Field(min_length=1, max_length=16)
+
+
+class ExportOut(Out):
+    id: uuid.UUID
+    kind: str
+    title: str
+    format: str
+    created_at: datetime
