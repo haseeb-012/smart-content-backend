@@ -56,7 +56,9 @@ Without keys the dashboard runs in **Demo mode** (local data, amber badge) — e
 |---|---|---|
 | backend `.env` | `SUPABASE_URL`, `DATABASE_URL` | Supabase → Project Settings (use `postgresql+asyncpg://…`) |
 | backend `.env` | `BILLING_PROVIDER=stripe_test`, `STRIPE_SECRET_KEY` (rk_test_…), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` (6) | Stripe **test mode** (see backend `docs/STATE.md`) |
-| backend `.env` | `GEMINI_API_KEY` | Google AI Studio (used from Phase 5) |
+| backend `.env` | `LLM_PROVIDER=gemini`, `GEMINI_API_KEY` | Google AI Studio |
+| backend `.env` | `CHANNEL_PROVIDER=apify`, `APIFY_TOKEN` | Apify → Settings → Integrations |
+| backend `.env` | `PUBLIC_API_URL` | Public backend URL (MCP lives at `/mcp`) |
 | dashboard `.env.local` | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_API_URL` | Supabase → API; backend URL |
 
 Supabase: add `<dashboard-url>/auth/callback` to Auth → Redirect URLs; enable Email (+ Google/Apple if wanted).
@@ -75,13 +77,17 @@ Make yourself admin after first login: `update public.profiles set is_admin = tr
 
 - Phase 5 step 2: **Channels watchlist + video ingestion + outlier score + Discover feed** live end-to-end (fake provider by default; Apify adapter ready — set `CHANNEL_PROVIDER=apify` + `APIFY_TOKEN`, then verify field mapping on the first run).
 
-**Not real yet (still demo data):** AI analysis/ideas/scripts (Gemini), hooks library, dashboard analytics, social verification, MCP server. Collections hold SAMPLE entries until the team curates real ones. Real creator data needs an Apify token.
+- Phase 5 steps 3–6 (all live end-to-end, each e2e-tested): **Deep Analysis** (Gemini, 1 credit on success), **Ideas** (+ free generator), **Hooks** (library, generator, watchlist), **Scripts** (versions, free expand, export), **Projects**, **Exports**, **Social verification** (bio code) + **Dashboard analytics**, **Describe your niche** search, **MCP server** (Streamable HTTP + Supabase OAuth, 11 tools). 115 backend tests.
 
-**Next (in order):** Phase 5 step 3: Deep Analysis (Gemini) → Ideas/Hooks/Scripts/Projects/Exports → MCP.
+**Runs on demo providers until keys are added:** `LLM_PROVIDER=fake` (set `gemini` + `GEMINI_API_KEY`), `CHANNEL_PROVIDER=fake` (set `apify` + `APIFY_TOKEN`), `BILLING_PROVIDER=mock` (set `stripe_test` + keys). Collections and the hook library hold SAMPLE entries (`scripts.seed_collections`, `scripts.seed_hooks`). Gemini and Apify request/response shapes must be checked on the first real call.
+
+**Next:** final full test with real keys → deploy (backend, dashboard, landing) → set `PUBLIC_API_URL`/`DASHBOARD_URL` to the real HTTPS URLs.
+
+**MCP setup (Supabase):** Authentication → OAuth Server → enable; authorization path `/oauth/consent`; allow dynamic client registration. Then `update public.profiles set mcp_enabled = true where email = '…';`
 
 **Local env files** (gitignored, already created on the original machine — recreate from `.env.example` elsewhere): backend `.env`, dashboard `.env.local`, landing `.env.local`.
 
-**Read first:** backend `docs/DECISIONS.md` (D1–D15), `docs/STATE.md`, `docs/API_CONTRACTS.md`; each frontend's `docs/STATE.md`.
+**Read first:** backend `docs/DECISIONS.md` (D1–D26), `docs/STATE.md`, `docs/API_CONTRACTS.md`; each frontend's `docs/STATE.md`.
 
 **Rules that must not break:** Stripe test mode only (app refuses live keys) · browser never gets secret keys · every provider behind an interface · AI = Gemini · never copy Sandcastles' logo/text/images · one milestone at a time, tests green before moving on.
 
