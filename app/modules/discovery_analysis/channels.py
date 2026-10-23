@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.errors import AppError, NotFound, PlanLimitError, RateLimited
-from app.models import AuditLog, Channel, Profile, Video, WorkspaceChannel
+from app.models import AuditLog, Channel, ChannelStat, Profile, SocialAccount, Video, WorkspaceChannel
 from app.modules.discovery_analysis.outlier import compute_outliers, engagement_rate
 from app.modules.discovery_analysis.providers import ChannelProvider, Platform, ProviderError
 from app.modules.identity.service import get_workspace_for
@@ -234,12 +234,26 @@ async def sync_channel(
                 v.views, v.likes, v.comments, v.shares = f.views, f.likes, f.comments, f.shares
                 v.engagement_rate = engagement_rate(f.views, f.likes, f.comments, f.shares)
                 v.fetched_at = now
+            # The owner's own (verified) channels also refresh followers — that's what the Dashboard charts.
+            is_verified = await db.scalar(
+                select(SocialAccount.id)
+                .where(SocialAccount.channel_id == ch.id, SocialAccount.status == "verified")
+                .limit(1)
+            )
+            if is_verified:
+                info = await provider.lookup(platform, ch.handle)
+                if info:
+                    ch.followers = info.followers if info.followers is not None else ch.followers
+                    ch.total_views = info.total_views if info.total_views is not None else ch.total_views
+                    ch.display_name = info.display_name or ch.display_name
+                    ch.avatar_url = info.avatar_url or ch.avatar_url
             all_videos = list(existing.values())
             for v, score in zip(all_videos, compute_outliers(all_videos), strict=True):
                 v.outlier_score = score
             ch.video_count = len(all_videos)
             ch.total_views = ch.total_views or sum(v.views for v in all_videos)
             ch.sync_status, ch.sync_error, ch.last_synced_at = "ok", None, now
+            await _snapshot(db, ch, sum(v.views for v in all_videos), now)
             await db.commit()
         except ProviderError as e:
             await db.rollback()
@@ -248,6 +262,18 @@ async def sync_channel(
             log.exception("sync_channel %s failed", channel_id)
             await db.rollback()
             await _mark_error(session_factory, channel_id, "Unexpected error while syncing.")
+
+
+async def _snapshot(db: AsyncSession, ch: Channel, views: int, now: datetime) -> None:
+    """Upsert today's stats row for the channel (one per day; later syncs overwrite)."""
+    today = now.date()
+    row = await db.scalar(
+        select(ChannelStat).where(ChannelStat.channel_id == ch.id, ChannelStat.captured_on == today)
+    )
+    if row is None:
+        row = ChannelStat(channel_id=ch.id, captured_on=today)
+        db.add(row)
+    row.followers, row.total_views, row.video_count = ch.followers, ch.total_views or views, ch.video_count
 
 
 async def _mark_error(session_factory: SessionFactory, channel_id: uuid.UUID, message: str) -> None:
@@ -261,7 +287,11 @@ async def _mark_error(session_factory: SessionFactory, channel_id: uuid.UUID, me
 async def channels_due_for_refresh(db: AsyncSession, older_than: timedelta) -> list[uuid.UUID]:
     """Tracked channels whose data is older than `older_than` (daily refresh job)."""
     cutoff = datetime.now(UTC) - older_than
-    tracked = select(WorkspaceChannel.channel_id).distinct()
+    tracked = select(WorkspaceChannel.channel_id).union(
+        select(SocialAccount.channel_id).where(
+            SocialAccount.status == "verified", SocialAccount.channel_id.is_not(None)
+        )
+    )
     rows = await db.scalars(
         select(Channel.id).where(
             Channel.id.in_(tracked), or_(Channel.last_synced_at.is_(None), Channel.last_synced_at < cutoff)
@@ -373,3 +403,35 @@ async def discover_feed(
     }
     rows = await db.execute(stmt.order_by(orders[f.sort], Video.id).limit(f.limit).offset(f.offset))
     return [(v, c) for v, c in rows.all()], total
+
+
+async def niche_search(
+    db: AsyncSession, provider: ChannelProvider, llm: Any, description: str, platform: Platform | None
+) -> list[Channel | tuple[Platform, str, str, int | None]]:
+    """'Describe your niche': the AI suggests handles, then every one is checked on the platform —
+    only accounts that exist are returned (the AI can't invent creators into the results)."""
+    import asyncio
+
+    handles: list[str] = []
+    for h in await llm.suggest_creators(description, platform):
+        h = h.strip().lstrip("@").lower()
+        if HANDLE_RE.match(h) and h not in handles:
+            handles.append(h)
+    platforms: list[Platform] = [platform] if platform else ["tiktok", "instagram", "youtube"]
+    pairs = [(p, h) for h in handles[:8] for p in platforms][:12]
+    known = {
+        (c.platform, c.handle): c
+        for c in await db.scalars(select(Channel).where(Channel.handle.in_([h for _, h in pairs])))
+    }
+
+    async def check(p: Platform, h: str) -> Channel | tuple[Platform, str, str, int | None] | None:
+        if (p, h) in known:
+            return known[(p, h)]
+        try:
+            info = await provider.lookup(p, h)
+        except ProviderError:
+            return None
+        return (info.platform, info.handle, info.display_name, info.followers) if info else None
+
+    results = await asyncio.gather(*(check(p, h) for p, h in pairs))
+    return [r for r in results if r is not None]

@@ -67,5 +67,10 @@
 - `uv run python -m scripts.seed_hooks` seeds 16 SAMPLE hooks.
 - 97 tests; ruff + mypy clean.
 
+## Done — Social verification, own-account analytics, niche search
+- Tables `social_accounts`, `channel_stats` (migration `0007`). `/me/social` (start, verify, remove), `/me/analytics?days=7|30|90`.
+- `POST /workspaces/{id}/channels/niche-search` — AI suggestions verified against the platform.
+- 108 tests; ruff + mypy clean. Dashboard + Settings → Social verification + Channels niche tab live (e2e 11/11).
+
 ## Next
-Wire dashboard Ideas/Hooks/Scripts/Projects/Exports to the API → social verification + own-account analytics (Dashboard) → niche search → MCP.
+MCP server → final full test with real keys (Supabase, Stripe test, Apify, Gemini).

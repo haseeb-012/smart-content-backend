@@ -64,6 +64,10 @@ class ChannelProvider(Protocol):
         """Most recent short-form videos, newest first."""
         ...
 
+    async def bio_has_code(self, platform: Platform, handle: str, code: str) -> bool | None:
+        """Social verification: is `code` in the account's public bio? None = bio couldn't be read."""
+        ...
+
     async def media_url(self, platform: Platform, video_url: str) -> str | None:
         """Fresh direct link to ONE video's file, fetched only when a user runs Deep Analysis.
         None for YouTube (the AI reads the URL itself) or when unavailable."""
@@ -132,6 +136,12 @@ class FakeChannelProvider:
 
     async def media_url(self, platform: Platform, video_url: str) -> str | None:
         return None  # the fake AI doesn't need the file
+
+    async def bio_has_code(self, platform: Platform, handle: str, code: str) -> bool | None:
+        # Demo: every code is "found", except handles containing 'nocode' (to exercise the failure path).
+        if "notfound" in handle:
+            return None
+        return "nocode" not in handle
 
 
 # ------------------------------------------------------------------------------------------ apify
@@ -330,6 +340,35 @@ class ApifyChannelProvider:
         ]
         videos = [v for v in (mapper(i) for i in await self._items(platform, handle, limit)) if v]
         return sorted(videos, key=lambda v: v.posted_at or datetime.min.replace(tzinfo=UTC), reverse=True)
+
+    async def bio_has_code(self, platform: Platform, handle: str, code: str) -> bool | None:
+        """Reads the public bio. ⚠ Field names follow the actors' docs — verify on first real run."""
+        if platform == "instagram":
+            items = await self._run(
+                self.s.apify_actor_instagram,
+                {
+                    "directUrls": [f"https://www.instagram.com/{handle}/"],
+                    "resultsType": "details",
+                    "resultsLimit": 1,
+                },
+            )
+            bios = [str(i.get("biography") or "") for i in items[:1]]
+        else:
+            items = await self._items(platform, handle, 1)
+            if platform == "tiktok":
+                bios = [str((i.get("authorMeta") or {}).get("signature") or "") for i in items[:1]]
+            else:
+                bios = [
+                    str(
+                        i.get("channelDescription")
+                        or (i.get("aboutChannelInfo") or {}).get("channelDescription")
+                        or ""
+                    )
+                    for i in items[:1]
+                ]
+        if not bios:
+            return None
+        return code.upper() in bios[0].upper()
 
     async def media_url(self, platform: Platform, video_url: str) -> str | None:
         """One-video lookup. TikTok: the actor downloads the file to Apify storage (mediaUrls).

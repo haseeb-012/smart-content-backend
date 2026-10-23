@@ -72,6 +72,11 @@ All errors: `{"error": {"code": string, "message": string, "details": object}}`
 | POST | `/workspaces/{id}/projects/{project_id}/items` | 🔒 owner/editor | `{kind: video\|idea\|script, ref_id}` → Project (moves the item if it was in another project) |
 | DELETE | `/workspaces/{id}/projects/{project_id}/items/{kind}/{ref_id}` | 🔒 owner/editor | → Project |
 | GET · POST | `/workspaces/{id}/exports` | 🔒 member | `{kind, title, format}` → 201 `{id, kind, title, format, created_at}` (export history) |
+| POST | `/workspaces/{id}/channels/niche-search` | 🔒 member (free, 20/h) | `{description 5–300, platform?}` → `ChannelSearchResult[]` (only accounts that exist) |
+| GET · POST | `/me/social` | 🔒 | `{platform, handle}` → 201 `{id, platform, handle, code, status: pending\|verified, verified_at, channel}` (idempotent per handle). `plan_limit` (403) |
+| POST | `/me/social/{id}/verify` | 🔒 owner (20 s cooldown) | → account (verified; videos import in background) · `code_not_found` (409) · `not_found` (404, bio unreadable) · `conflict` (409, verified by another user) |
+| DELETE | `/me/social/{id}` | 🔒 owner | → 204 |
+| GET | `/me/analytics?days=7\|30\|90` | 🔒 | → `{days, accounts, total_followers, followers_gained (null until 2 snapshots), views, posts, views_by_day[{date,value}], followers_by_day[{date,value}], recent_videos: FeedVideo[]}` — verified accounts only |
 | GET | `/admin/users/{id}` | 🔒 admin | → `{profile, credits}` |
 | PATCH | `/admin/users/{id}/plan` | 🔒 admin | `{plan}` → `{profile, credits}` (audited) |
 | POST | `/admin/users/{id}/credits` | 🔒 admin | `{amount, reason}` → `{profile, credits}` (audited) |

@@ -13,6 +13,7 @@ from app.core.ratelimit import RateLimiter, client_key
 from app.db.session import get_db, get_sessionmaker
 from app.models import Channel, Profile, WorkspaceChannel
 from app.modules.discovery_analysis import channels as svc
+from app.modules.discovery_analysis.llm import LLMProvider, get_llm_provider
 from app.modules.discovery_analysis.providers import ChannelProvider, get_channel_provider
 from app.modules.identity.service import get_workspace_for
 from app.schemas import (
@@ -21,12 +22,14 @@ from app.schemas import (
     ChannelOut,
     ChannelSearchResult,
     FeedPage,
+    NicheSearchIn,
     Platform,
     WatchlistItem,
 )
 
 router = APIRouter(tags=["channels"])
 search_limiter = RateLimiter(limit=30, window_seconds=60)
+niche_limiter = RateLimiter(limit=20, window_seconds=3600)
 
 
 def get_session_factory() -> svc.SessionFactory:
@@ -120,39 +123,7 @@ async def search(
     """Search known creators by name/handle + exact-handle lookup on the platforms."""
     search_limiter.check(f"{profile.id}:{client_key(request)}")
     await get_workspace_for(db, profile, workspace_id)
-    tracked = set(
-        (
-            await db.scalars(
-                select(WorkspaceChannel.channel_id).where(WorkspaceChannel.workspace_id == workspace_id)
-            )
-        ).all()
-    )
-    out: list[ChannelSearchResult] = []
-    for r in await svc.search_channels(db, provider, q, platform):
-        if isinstance(r, Channel):
-            out.append(
-                ChannelSearchResult(
-                    platform=r.platform,  # type: ignore[arg-type]
-                    handle=r.handle,
-                    display_name=r.display_name,
-                    followers=r.followers,
-                    channel_id=r.id,
-                    tracked=r.id in tracked,
-                )
-            )
-        else:
-            p, h, name, followers = r
-            out.append(
-                ChannelSearchResult(
-                    platform=p,
-                    handle=h,
-                    display_name=name,
-                    followers=followers,
-                    channel_id=None,
-                    tracked=False,
-                )
-            )
-    return out
+    return await _search_out(db, workspace_id, await svc.search_channels(db, provider, q, platform))
 
 
 @router.get("/workspaces/{workspace_id}/videos", response_model=FeedPage)
@@ -192,4 +163,57 @@ async def discover(
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+async def _search_out(db: AsyncSession, workspace_id: uuid.UUID, found: list) -> list[ChannelSearchResult]:  # type: ignore[type-arg]
+    tracked = set(
+        (
+            await db.scalars(
+                select(WorkspaceChannel.channel_id).where(WorkspaceChannel.workspace_id == workspace_id)
+            )
+        ).all()
+    )
+    out: list[ChannelSearchResult] = []
+    for r in found:
+        if isinstance(r, Channel):
+            out.append(
+                ChannelSearchResult(
+                    platform=r.platform,  # type: ignore[arg-type]
+                    handle=r.handle,
+                    display_name=r.display_name,
+                    followers=r.followers,
+                    channel_id=r.id,
+                    tracked=r.id in tracked,
+                )
+            )
+        else:
+            p, h, name, followers = r
+            out.append(
+                ChannelSearchResult(
+                    platform=p,
+                    handle=h,
+                    display_name=name,
+                    followers=followers,
+                    channel_id=None,
+                    tracked=False,
+                )
+            )
+    return out
+
+
+@router.post("/workspaces/{workspace_id}/channels/niche-search", response_model=list[ChannelSearchResult])
+async def niche_search(
+    workspace_id: uuid.UUID,
+    body: NicheSearchIn,
+    profile: Profile = Depends(current_profile),
+    db: AsyncSession = Depends(get_db),
+    provider: ChannelProvider = Depends(get_channel_provider),
+    llm: LLMProvider = Depends(get_llm_provider),
+):
+    """'Describe your niche' → AI-suggested creators, each verified to exist. Free (rate-limited)."""
+    await get_workspace_for(db, profile, workspace_id)
+    niche_limiter.check(str(profile.id))
+    return await _search_out(
+        db, workspace_id, await svc.niche_search(db, provider, llm, body.description, body.platform)
     )

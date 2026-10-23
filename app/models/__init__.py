@@ -2,13 +2,14 @@
 via `profiles.id` (the FK to auth.users is added in the Postgres migration only)."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -244,6 +245,42 @@ class Idea(Timestamped, Base):
     personalization: Mapped[str] = mapped_column(Text, default="", nullable=False)
     shortlisted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("profiles.id", ondelete="SET NULL"))
+
+
+class SocialAccount(Timestamped, Base):
+    """A creator account the user claims as their own (PRD §9.13). Verified by a code in the bio —
+    never a password. Verified accounts power the Dashboard analytics. Plan limits the verified count."""
+
+    __tablename__ = "social_accounts"
+    __table_args__ = (
+        UniqueConstraint("user_id", "platform", "handle", name="uq_social_accounts_user_platform_handle"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), index=True)
+    platform: Mapped[str] = mapped_column(String(16), nullable=False)
+    handle: Mapped[str] = mapped_column(String(100), nullable=False)
+    code: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)  # pending | verified
+    channel_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("channels.id", ondelete="SET NULL"), index=True
+    )
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ChannelStat(Base):
+    """One snapshot per channel per day, written on every sync — the basis for growth charts."""
+
+    __tablename__ = "channel_stats"
+    __table_args__ = (UniqueConstraint("channel_id", "captured_on", name="uq_channel_stats_channel_day"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    channel_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("channels.id", ondelete="CASCADE"), index=True)
+    captured_on: Mapped[date] = mapped_column(Date, nullable=False)
+    followers: Mapped[int | None] = mapped_column(BigInteger)
+    total_views: Mapped[int | None] = mapped_column(BigInteger)
+    video_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class HookTemplate(Timestamped, Base):

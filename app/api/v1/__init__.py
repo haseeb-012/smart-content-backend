@@ -9,6 +9,7 @@ from app.api.v1 import (
     credits,
     me,
     plans,
+    social,
     studio,
     waitlist,
     workspaces,
@@ -22,6 +23,7 @@ router.include_router(studio.admin_router)
 router.include_router(collections.router)
 router.include_router(collections.admin_router)
 router.include_router(billing.router)
+router.include_router(social.router)
 router.include_router(me.router)
 router.include_router(plans.router)
 router.include_router(workspaces.router)

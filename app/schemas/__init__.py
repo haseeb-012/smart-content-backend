@@ -506,3 +506,43 @@ class ExportOut(Out):
     title: str
     format: str
     created_at: datetime
+
+
+# ------------------------------------------------------------------ social verification + analytics
+
+
+class SocialStart(BaseModel):
+    platform: Platform
+    handle: str = Field(min_length=1, max_length=101)
+
+
+class SocialAccountOut(BaseModel):
+    id: uuid.UUID
+    platform: Platform
+    handle: str
+    code: str
+    status: Literal["pending", "verified"]
+    verified_at: datetime | None
+    channel: ChannelOut | None
+
+
+class SeriesPoint(BaseModel):
+    date: date
+    value: int
+
+
+class AnalyticsOut(BaseModel):
+    days: int
+    accounts: list[SocialAccountOut]
+    total_followers: int | None
+    followers_gained: int | None
+    views: int
+    posts: int
+    views_by_day: list[SeriesPoint]
+    followers_by_day: list[SeriesPoint]
+    recent_videos: list[FeedVideo]
+
+
+class NicheSearchIn(BaseModel):
+    description: str = Field(min_length=5, max_length=300)
+    platform: Platform | None = None
