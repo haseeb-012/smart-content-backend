@@ -2,7 +2,7 @@
 
 ## ▶ Resume here (status at end of 2026-10-23)
 
-**All product features are built and pushed.** 115 backend tests green; live e2e passed for every module.
+**All product features are built and pushed.** 116 backend tests green; live e2e passed for every module.
 
 **Real setup done**
 - Supabase: database connected (Session pooler, `postgresql+asyncpg`), migrations at `0008` (24 tables), sample Collections (8) + Hooks (16) seeded.
@@ -11,13 +11,25 @@
 - Stripe test: secret + publishable test keys and all 6 `STRIPE_PRICE_*` IDs filled in.
 - Apify token filled in.
 
-**Still to do (in this order)**
-1. `GEMINI_API_KEY` → then `LLM_PROVIDER=gemini` (backend `.env`).
-2. `CHANNEL_PROVIDER=apify` (token already present).
-3. Full test with real Gemini + Apify (verify Apify field mapping, Gemini Interactions response shape, bio-code check fields).
+**Late 2026-10-23 updates**
+- Owner switched `CHANNEL_PROVIDER=apify` in the local `.env`. Apify token works (Apify answered `201 Created`).
+- GitHub CI failure fixed (`3ef136a`): an MCP test polled past the 120/min MCP rate limit on slow CI. Tests now:
+  - never use real services: `tests/conftest.py` forces demo providers and empty keys, whatever the local `.env` says
+  - wait for background imports instead of polling
+  - keep a separate test proving the rate limit still works
+
+  Local result: 116 passed (one unexplained single failure in ~13 runs; check CI).
+- Dropdowns/inputs ignoring a custom width fixed (dashboard `bd002fe`). The Connectors tool list now shows correctly.
+
+**Still to do (in this order) — START HERE TOMORROW**
+1. **Live Apify test** with one real creator (owner picks a handle): start backend → add the creator via the API → check that real videos, views and outlier scores come back. This verifies the Apify field mapping in `providers.py` (still unverified) — fix the mappers if fields differ.
+2. `GEMINI_API_KEY` → then `LLM_PROVIDER=gemini` (backend `.env`).
+3. Full test with real Gemini + Apify: analysis on a real TikTok/Instagram/YouTube video (verifies the Gemini Interactions response shape and the media download), scripts, ideas, hooks, niche search, bio-code verification fields.
 4. Deploy: backend (Render/Railway), dashboard + landing (Vercel). Then set `PUBLIC_API_URL`, `DASHBOARD_URL`, `CORS_ORIGINS`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_DASHBOARD_URL`, `NEXT_PUBLIC_MCP_URL`; Supabase Site URL + redirect URL → real domains.
 5. Stripe webhook (needs the online URL): Developers → Webhooks → `https://<backend>/api/v1/billing/webhook`, events `checkout.session.completed`, `customer.subscription.created|updated|deleted`, `invoice.paid`, `invoice.payment_failed` → `STRIPE_WEBHOOK_SECRET=whsec_…` → `BILLING_PROVIDER=stripe_test` (the app refuses to start in stripe_test without the secret). Stripe Customer Portal: enable cancel / update payment / switch plans (all 3 products).
 6. Test payment with card 4242 4242 4242 4242; connect Claude to `https://<backend>/mcp`.
+
+**How MCP works (for the owner)**: Claude → Settings → Connectors → Add custom connector → paste `https://<backend>/mcp` → browser opens → sign in → `/oauth/consent` → Allow access. Then ask in plain language; 11 tools, Allow/Block per tool in Settings → Connectors. Only possible after deployment (Claude needs a public HTTPS URL).
 
 **Run locally**
 - Backend: `cd smart-content-backend && uv run uvicorn app.main:app --port 8000` (uses `.env`; now the real Supabase DB).
