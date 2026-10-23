@@ -6,8 +6,22 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
-os.environ.setdefault("ENV", "test")
-os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
+# Tests never touch real services, whatever the local .env says (env vars beat .env in pydantic-settings).
+os.environ.update(
+    {
+        "ENV": "test",
+        "DATABASE_URL": "sqlite+aiosqlite://",
+        "CHANNEL_PROVIDER": "fake",
+        "LLM_PROVIDER": "fake",
+        "BILLING_PROVIDER": "mock",
+        "SUPABASE_URL": "https://test.supabase.co",
+        "STRIPE_SECRET_KEY": "",
+        "STRIPE_WEBHOOK_SECRET": "",
+        "APIFY_TOKEN": "",
+        "GEMINI_API_KEY": "",
+        **{f"STRIPE_PRICE_{p}_{c}": "" for p in ("PRO", "VISIONARY", "TITAN") for c in ("MONTHLY", "YEARLY")},
+    }
+)
 
 import jwt
 import pytest

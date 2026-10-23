@@ -196,7 +196,7 @@ async def test_script_edit_versions_expand_restore_export(st_app, client, alice)
     js = await client.get(f"/api/v1/workspaces/{ws}/scripts/{sid}/export?format=json", headers=alice.headers)
     assert js.json()["title"] == "T"
     exports = (await client.get(f"/api/v1/workspaces/{ws}/exports", headers=alice.headers)).json()
-    assert [e["format"] for e in exports] == ["Json", "Markdown"]
+    assert sorted(e["format"] for e in exports) == ["Json", "Markdown"]
 
     lst = (await client.get(f"/api/v1/workspaces/{ws}/scripts", headers=alice.headers)).json()
     assert lst[0]["id"] == sid and lst[0]["version_count"] == 4

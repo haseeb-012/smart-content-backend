@@ -1,18 +1,22 @@
 """MCP server: OAuth discovery, gating, JSON-RPC protocol, tools, permissions, credits."""
 
+import asyncio
+
 import pytest
 
 from app.api.mcp import mcp_limiter
 from app.api.v1.channels import get_session_factory, niche_limiter, search_limiter
 from app.models import Profile
-from app.modules.mcp.tools import TOOL_NAMES
+from app.modules.mcp.tools import TOOL_NAMES, _background
 
 
 @pytest.fixture
-def mcp_app(app, sessionmaker):
+def mcp_app(app, sessionmaker, monkeypatch):
     app.dependency_overrides[get_session_factory] = lambda: sessionmaker
     for lim in (mcp_limiter, search_limiter, niche_limiter):
         lim.reset()
+    # Tests poll while background imports run; slow CI machines must not trip the per-minute limit.
+    monkeypatch.setattr(mcp_limiter, "limit", 10_000)
     return app
 
 
@@ -35,6 +39,8 @@ async def rpc(client, user, method, params=None, id_=1):
 async def call(client, user, name, args=None):
     r = await rpc(client, user, "tools/call", {"name": name, "arguments": args or {}})
     assert r.status_code == 200, r.text
+    if _background:  # let channels-add's background import finish before the next call
+        await asyncio.gather(*list(_background))
     return r.json()["result"]
 
 
@@ -98,11 +104,11 @@ async def test_tools_end_to_end_with_credit_rules(mcp_app, client, alice, db):
     assert res["isError"] is False and res["structuredContent"]["added"] is True
     import asyncio
 
-    for _ in range(200):  # background sync
+    for _ in range(100):  # background sync
         recap = (await call(client, alice, "channels-recap"))["structuredContent"]
         if recap["channels"][0]["videos_tracked"]:
             break
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.2)
     assert recap["channels"][0]["videos_tracked"] == 60
 
     vids = (await call(client, alice, "videos-watchlist", {"min_outlier": 5, "limit": 5}))[
@@ -162,12 +168,12 @@ async def test_workspace_selection_and_isolation(mcp_app, client, alice, bob, db
     vid = None
     import asyncio
 
-    for _ in range(200):
+    for _ in range(100):
         v = (await call(client, alice, "videos-watchlist"))["structuredContent"]["videos"]
         if v:
             vid = v[0]["video_id"]
             break
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.2)
     assert vid
     leak = await call(client, bob, "video-details", {"video_id": vid})
     assert leak["isError"] is True
@@ -188,3 +194,11 @@ async def test_tool_permissions(mcp_app, client, alice, db):
     assert res["isError"] is True and "blocked" in res["content"][0]["text"]
     r = await client.patch("/api/v1/me/mcp", headers=alice.headers, json={"permissions": {"rm-rf": "block"}})
     assert r.status_code == 422
+
+
+async def test_mcp_rate_limit_still_applies(app, client, alice, db):
+    mcp_limiter.reset()
+    await _enable(client, alice, db)
+    statuses = [(await rpc(client, alice, "ping")).status_code for _ in range(mcp_limiter.limit + 1)]
+    assert statuses[-1] == 429 and set(statuses[:-1]) == {200}
+    mcp_limiter.reset()
