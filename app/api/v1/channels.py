@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Respons
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1._common import feed_video
 from app.core.deps import current_profile
 from app.core.ratelimit import RateLimiter, client_key
 from app.db.session import get_db, get_sessionmaker
@@ -20,7 +21,6 @@ from app.schemas import (
     ChannelOut,
     ChannelSearchResult,
     FeedPage,
-    FeedVideo,
     Platform,
     WatchlistItem,
 )
@@ -188,25 +188,7 @@ async def discover(
     )
     rows, total = await svc.discover_feed(db, profile, workspace_id, f)
     return FeedPage(
-        items=[
-            FeedVideo(
-                id=v.id,
-                platform=v.platform,  # type: ignore[arg-type]
-                url=v.url,
-                caption=v.caption,
-                thumbnail_url=v.thumbnail_url,
-                posted_at=v.posted_at,
-                duration_sec=v.duration_sec,
-                views=v.views,
-                likes=v.likes,
-                comments=v.comments,
-                shares=v.shares,
-                engagement_rate=v.engagement_rate,
-                outlier_score=v.outlier_score,
-                channel=ChannelOut.model_validate(c),
-            )
-            for v, c in rows
-        ],
+        items=[feed_video(v, c) for v, c in rows],
         total=total,
         limit=limit,
         offset=offset,

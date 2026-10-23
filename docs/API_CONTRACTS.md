@@ -50,6 +50,11 @@ All errors: `{"error": {"code": string, "message": string, "details": object}}`
 | GET | `/workspaces/{id}/channels/suggested` | 🔒 member | → `Channel[]` (most-tracked elsewhere, not in this workspace) |
 | GET | `/workspaces/{id}/channels/search?q=&platform=` | 🔒 member (30/min) | → `{platform, handle, display_name, followers, channel_id (null = not stored yet), tracked}[]` |
 | GET | `/workspaces/{id}/videos?channel_id=…&platform=&min_outlier=&min_views=&max_views=&min_engagement=&posted_within_days=&q=&sort=outlier\|views\|engagement\|newest&limit=48&offset=0` | 🔒 member | → `{items: FeedVideo[], total, limit, offset}`. FeedVideo: `{id, platform, url, caption, thumbnail_url, posted_at, duration_sec, views, likes, comments, shares, engagement_rate, outlier_score, channel}`. Filters AND together. Free |
+| GET | `/workspaces/{id}/videos/{video_id}` | 🔒 member | → `{video: FeedVideo, analysis: Analysis\|null, idea: Idea\|null}`. Visible if the workspace tracks the channel or already analyzed it. Poll while `queued/processing`. Free |
+| POST | `/workspaces/{id}/videos/{video_id}/analysis` | 🔒 owner/editor (10/min) | → 202 `Analysis` (queued/running) · 200 if already complete (free). `credits_exhausted` (402) · `rate_limited` (429, daily cap). Analysis: `{id, video_id, status: queued\|processing\|complete\|failed, error, provider, model, summary, transcript: [{t:"MM:SS", text}], hook, hook_category, format, visual, idea, created_at, started_at, completed_at}`. 1 credit, charged only on success |
+| GET | `/workspaces/{id}/ideas?shortlisted=` | 🔒 member | → `Idea[]` `{id, video_id, analysis_id, source: analysis\|generated\|manual, title, positioning, format, contrast, personalization, shortlisted, created_at}` |
+| PATCH | `/workspaces/{id}/ideas/{idea_id}` | 🔒 owner/editor | `{shortlisted?, title?}` → Idea |
+| DELETE | `/workspaces/{id}/ideas/{idea_id}` | 🔒 owner/editor | → 204 |
 | GET | `/admin/users/{id}` | 🔒 admin | → `{profile, credits}` |
 | PATCH | `/admin/users/{id}/plan` | 🔒 admin | `{plan}` → `{profile, credits}` (audited) |
 | POST | `/admin/users/{id}/credits` | 🔒 admin | `{amount, reason}` → `{profile, credits}` (audited) |

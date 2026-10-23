@@ -51,5 +51,14 @@
 - Never transcribes or AI-analyses scraped videos (only on Deep Analyze — next step).
 - 62 tests; ruff + mypy clean. Dashboard Channels + Videos live (e2e 9/9).
 
-## Next — Phase 5 step 3: Deep Analysis (Gemini)
-Async analysis job (queued → processing → complete), 1 credit charged on success only (idempotent key per workspace+video), Gemini video understanding → transcript, summary, idea, hook, format, visual; idea auto-created; cost cap per user. Needs `GEMINI_API_KEY`. Consider adding Redis + a worker here (master prompt: Celery when analysis starts).
+## Done — Phase 5 step 3: Deep Analysis
+- Tables `video_analyses` (one per workspace + video) and `ideas` (migration `0005`, RLS on Postgres).
+- `LLMProvider` interface (`app/modules/discovery_analysis/llm.py`): `FakeLLMProvider` (default) and `GeminiLLMProvider`
+  (Interactions API, model `gemini-3.8-flash`, JSON-schema output). ⚠ Verify the request/response shape on the first real call.
+- Flow: POST analysis → queued (balance checked, daily cap) → background run → complete + idea created + **1 credit charged in the same commit**. Failure → `failed` with a clear message, nothing charged, retry allowed. Re-open is free.
+- Media: YouTube by URL; TikTok/Instagram get a fresh direct link for that one video via Apify, downloaded in memory under strict safety rules (D22), never stored.
+- Ideas API: list (filter shortlisted), shortlist/rename, delete.
+- 81 tests; ruff + mypy clean. Dashboard video page live (cards → analysis screen with polling).
+
+## Next
+Ideas page + idea generator → Hooks → Scripts → Projects/Exports → dashboard stats → social verification → MCP. Celery/Redis still deferred: analyses are single background tasks with a stale-run guard (15 min).

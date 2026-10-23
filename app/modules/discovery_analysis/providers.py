@@ -64,6 +64,11 @@ class ChannelProvider(Protocol):
         """Most recent short-form videos, newest first."""
         ...
 
+    async def media_url(self, platform: Platform, video_url: str) -> str | None:
+        """Fresh direct link to ONE video's file, fetched only when a user runs Deep Analysis.
+        None for YouTube (the AI reads the URL itself) or when unavailable."""
+        ...
+
 
 # ------------------------------------------------------------------------------------------ fake
 
@@ -124,6 +129,9 @@ class FakeChannelProvider:
                 )
             )
         return out
+
+    async def media_url(self, platform: Platform, video_url: str) -> str | None:
+        return None  # the fake AI doesn't need the file
 
 
 # ------------------------------------------------------------------------------------------ apify
@@ -322,6 +330,30 @@ class ApifyChannelProvider:
         ]
         videos = [v for v in (mapper(i) for i in await self._items(platform, handle, limit)) if v]
         return sorted(videos, key=lambda v: v.posted_at or datetime.min.replace(tzinfo=UTC), reverse=True)
+
+    async def media_url(self, platform: Platform, video_url: str) -> str | None:
+        """One-video lookup. TikTok: the actor downloads the file to Apify storage (mediaUrls).
+        Instagram: the post's CDN link (videoUrl). Links expire, so they are never stored."""
+        if platform == "youtube":
+            return None
+        if platform == "tiktok":
+            items = await self._run(
+                self.s.apify_actor_tiktok,
+                {"postURLs": [video_url], "shouldDownloadVideos": True, "shouldDownloadCovers": False},
+            )
+            for it in items:
+                urls = it.get("mediaUrls") or []
+                if urls and isinstance(urls[0], str):
+                    return urls[0]
+            return None
+        items = await self._run(
+            self.s.apify_actor_instagram,
+            {"directUrls": [video_url], "resultsType": "posts", "resultsLimit": 1},
+        )
+        for it in items:
+            if isinstance(it.get("videoUrl"), str):
+                return str(it["videoUrl"])
+        return None
 
 
 @lru_cache

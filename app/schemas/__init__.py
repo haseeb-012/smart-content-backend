@@ -298,6 +298,58 @@ class FeedPage(BaseModel):
     offset: int
 
 
+AnalysisStatus = Literal["queued", "processing", "complete", "failed"]
+
+
+class TranscriptLineOut(BaseModel):
+    t: str
+    text: str
+
+
+class AnalysisOut(Out):
+    id: uuid.UUID
+    video_id: uuid.UUID
+    status: AnalysisStatus
+    error: str | None
+    provider: str | None
+    model: str | None
+    summary: str | None
+    transcript: list[TranscriptLineOut]
+    hook: str | None
+    hook_category: str | None
+    format: str | None
+    visual: str | None
+    idea: str | None
+    created_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+
+
+class IdeaOut(Out):
+    id: uuid.UUID
+    video_id: uuid.UUID | None
+    analysis_id: uuid.UUID | None
+    source: Literal["analysis", "generated", "manual"]
+    title: str
+    positioning: str
+    format: str
+    contrast: str
+    personalization: str
+    shortlisted: bool
+    created_at: datetime
+
+
+class IdeaPatch(BaseModel):
+    shortlisted: bool | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class VideoDetail(BaseModel):
+    video: FeedVideo
+    analysis: AnalysisOut | None
+    idea: IdeaOut | None
+
+
 class WaitlistEntryOut(Out):
     email: str
     plan: str

@@ -55,8 +55,16 @@ class Settings(BaseSettings):
     # How many recent videos to pull per channel on each sync (outlier baseline needs ≥ 31).
     ingest_videos_per_channel: int = 60
 
-    llm_provider: Literal["gemini", "mock"] = "gemini"
+    # AI (behind LLMProvider, decision D11). "fake" = deterministic demo analysis, no network.
+    llm_provider: Literal["fake", "gemini"] = "fake"
     gemini_api_key: str = ""
+    # Verified on ai.google.dev/gemini-api/docs/models (2026-10-23). Configurable because models rotate.
+    gemini_model: str = "gemini-3.8-flash"
+    gemini_timeout_seconds: int = 240
+    # Inline video upload cap (Gemini: inline requests should stay under ~20 MB).
+    gemini_max_video_mb: int = 18
+    # Per-user cost cap (PRD §18 open item → safe default): Deep Analyses started per user per day.
+    analysis_daily_limit: int = 50
 
     # Credits
     default_plan: Literal["pro", "visionary", "titan"] = "pro"
@@ -75,6 +83,8 @@ class Settings(BaseSettings):
             raise ValueError("SUPABASE_URL is required outside local/test.")
         if self.channel_provider == "apify" and not self.apify_token:
             raise ValueError("CHANNEL_PROVIDER=apify needs APIFY_TOKEN.")
+        if self.llm_provider == "gemini" and not self.gemini_api_key:
+            raise ValueError("LLM_PROVIDER=gemini needs GEMINI_API_KEY.")
         if self.billing_provider == "stripe_test":
             if not self.stripe_secret_key.startswith(("sk_test_", "rk_test_")):
                 raise ValueError("BILLING_PROVIDER=stripe_test needs a test key (rk_test_… or sk_test_…).")

@@ -181,6 +181,71 @@ class Video(Timestamped, Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
+class VideoAnalysis(Timestamped, Base):
+    """A workspace's Deep Analysis of one video (PRD §9.6). Runs only on a user's click — never in bulk.
+    1 credit, charged only when it completes (ledger key `analysis:{id}` → at most once per row)."""
+
+    __tablename__ = "video_analyses"
+    __table_args__ = (UniqueConstraint("workspace_id", "video_id", name="uq_video_analyses_ws_video"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    video_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("videos.id", ondelete="CASCADE"), index=True)
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("profiles.id", ondelete="SET NULL"), index=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), default="queued", nullable=False
+    )  # queued|processing|complete|failed
+    error: Mapped[str | None] = mapped_column(String(300))
+    attempts: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(32))
+    model: Mapped[str | None] = mapped_column(String(64))
+    summary: Mapped[str | None] = mapped_column(Text)
+    transcript: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list, nullable=False)
+    hook: Mapped[str | None] = mapped_column(Text)
+    hook_category: Mapped[str | None] = mapped_column(String(32))
+    format: Mapped[str | None] = mapped_column(Text)
+    visual: Mapped[str | None] = mapped_column(Text)
+    idea: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class Idea(Timestamped, Base):
+    """A content idea in a workspace. Created free from a completed analysis (source=analysis),
+    by the idea generator, or by hand."""
+
+    __tablename__ = "ideas"
+    __table_args__ = (UniqueConstraint("analysis_id", name="uq_ideas_analysis_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    video_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("videos.id", ondelete="SET NULL"), index=True
+    )
+    analysis_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("video_analyses.id", ondelete="SET NULL")
+    )
+    source: Mapped[str] = mapped_column(
+        String(16), default="analysis", nullable=False
+    )  # analysis|generated|manual
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    positioning: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    format: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    contrast: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    personalization: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    shortlisted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("profiles.id", ondelete="SET NULL"))
+
+
 class Collection(Timestamped, Base):
     """Team-curated group of outlier videos sharing one pattern (PRD §9.10). Free for everyone.
     Users can't create their own in v1 (FR-COL-07) — only admins write."""
