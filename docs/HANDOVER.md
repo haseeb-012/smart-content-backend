@@ -1,5 +1,29 @@
 # Smart Content — Handover (2026-10-23)
 
+## ▶ Resume here (status at end of 2026-10-23)
+
+**All product features are built and pushed.** 115 backend tests green; live e2e passed for every module.
+
+**Real setup done**
+- Supabase: database connected (Session pooler, `postgresql+asyncpg`), migrations at `0008` (24 tables), sample Collections (8) + Hooks (16) seeded.
+- Supabase website: Site URL `http://localhost:3001`, redirect `…/auth/callback`, Email on, OAuth Server on (`/oauth/consent`, dynamic registration), ES256 signing keys.
+- Owner account `haseebsajjad666@gmail.com` signed up and confirmed; `is_admin = true`, `mcp_enabled = true`; workspace "Fitness".
+- Stripe test: secret + publishable test keys and all 6 `STRIPE_PRICE_*` IDs filled in.
+- Apify token filled in.
+
+**Still to do (in this order)**
+1. `GEMINI_API_KEY` → then `LLM_PROVIDER=gemini` (backend `.env`).
+2. `CHANNEL_PROVIDER=apify` (token already present).
+3. Full test with real Gemini + Apify (verify Apify field mapping, Gemini Interactions response shape, bio-code check fields).
+4. Deploy: backend (Render/Railway), dashboard + landing (Vercel). Then set `PUBLIC_API_URL`, `DASHBOARD_URL`, `CORS_ORIGINS`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_DASHBOARD_URL`, `NEXT_PUBLIC_MCP_URL`; Supabase Site URL + redirect URL → real domains.
+5. Stripe webhook (needs the online URL): Developers → Webhooks → `https://<backend>/api/v1/billing/webhook`, events `checkout.session.completed`, `customer.subscription.created|updated|deleted`, `invoice.paid`, `invoice.payment_failed` → `STRIPE_WEBHOOK_SECRET=whsec_…` → `BILLING_PROVIDER=stripe_test` (the app refuses to start in stripe_test without the secret). Stripe Customer Portal: enable cancel / update payment / switch plans (all 3 products).
+6. Test payment with card 4242 4242 4242 4242; connect Claude to `https://<backend>/mcp`.
+
+**Run locally**
+- Backend: `cd smart-content-backend && uv run uvicorn app.main:app --port 8000` (uses `.env`; now the real Supabase DB).
+- Dashboard: `cd smart-content-dashboard && npm run dev -- -p 3001` (live mode — `.env.local` has Supabase + API URL).
+- Landing: `cd smart-content-landing && npm run dev` → :3000.
+
 Short-form video research & scriptwriting SaaS (layout modelled on sandcastles.ai, own brand).
 Three repos, one product:
 

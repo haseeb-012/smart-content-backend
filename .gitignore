@@ -8,3 +8,6 @@ __pycache__/
 *.db
 docs/research/har/
 docs/research/screenshots/
+
+# local env backups (contain secrets)
+.env.bak*
