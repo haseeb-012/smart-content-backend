@@ -173,6 +173,23 @@ def _dt(v: Any) -> datetime | None:
         return None
 
 
+def _duration(v: Any) -> int | None:
+    """Seconds from 31, "31", "0:31" or "1:02:03" (the YouTube actor returns clock strings)."""
+    if v is None or v == "":
+        return None
+    s = str(v).strip()
+    if s.isdigit():
+        return int(s)
+    try:
+        parts = [int(p) for p in s.split(":")]
+    except ValueError:
+        return None
+    total = 0
+    for p in parts:
+        total = total * 60 + p
+    return total if len(parts) <= 3 else None
+
+
 def map_tiktok_video(item: dict[str, Any]) -> VideoInfo | None:
     vid = item.get("id")
     url = item.get("webVideoUrl")
@@ -248,7 +265,7 @@ def map_youtube_video(item: dict[str, Any]) -> VideoInfo | None:
         caption=item.get("title") or item.get("text") or "",
         thumbnail_url=item.get("thumbnailUrl"),
         posted_at=_dt(item.get("date") or item.get("publishedAt")),
-        duration_sec=_opt_int(item.get("duration")) if str(item.get("duration", "")).isdigit() else None,
+        duration_sec=_duration(item.get("duration")),
         views=_int(item.get("viewCount")),
         likes=_int(item.get("likes")),
         comments=_int(item.get("commentsCount")),
@@ -294,7 +311,7 @@ class ApifyChannelProvider:
                 "resultsType": "posts",
                 "resultsLimit": limit,
             }
-        return self.s.apify_actor_youtube, {"channels": [handle], "maxResults": limit}
+        return self.s.apify_actor_youtube, {"channels": [handle], "maxResultsShorts": limit}
 
     async def _run(self, actor: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
         url = f"{self.BASE}/{actor}/run-sync-get-dataset-items"

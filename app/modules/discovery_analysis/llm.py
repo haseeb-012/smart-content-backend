@@ -312,14 +312,21 @@ def check_media_url(url: str) -> str:
     return p.hostname
 
 
-async def download_media(client: httpx.AsyncClient, url: str, max_bytes: int) -> tuple[bytes, str]:
-    """Fetch a short video into memory with the safety rules above. Returns (bytes, mime_type)."""
+async def download_media(
+    client: httpx.AsyncClient, url: str, max_bytes: int, host_auth: dict[str, str] | None = None
+) -> tuple[bytes, str]:
+    """Fetch a short video into memory with the safety rules above. Returns (bytes, mime_type).
+    `host_auth` maps an exact host to an Authorization header value, sent ONLY to that host
+    (re-checked on every redirect) — used for Apify storage, which needs the Apify token."""
     for _ in range(MAX_REDIRECTS + 1):
         host = check_media_url(url)
         if not await _resolves_public(host, 443):
             raise ProviderError("This video's media link isn't safe to open. No credit was charged.")
+        headers = (
+            {"Authorization": host_auth[host.lower()]} if host_auth and host.lower() in host_auth else {}
+        )
         try:
-            async with client.stream("GET", url, follow_redirects=False) as r:
+            async with client.stream("GET", url, follow_redirects=False, headers=headers) as r:
                 if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("location"):
                     url = urljoin(url, r.headers["location"])
                     continue
@@ -478,8 +485,9 @@ class GeminiLLMProvider:
             raise ProviderError(
                 "We couldn't get this video's file. Try again shortly — no credit was charged."
             )
+        auth = {"api.apify.com": f"Bearer {self.s.apify_token}"} if self.s.apify_token else None
         data, mime = await download_media(
-            self.client, ctx.media_url, self.s.gemini_max_video_mb * 1024 * 1024
+            self.client, ctx.media_url, self.s.gemini_max_video_mb * 1024 * 1024, host_auth=auth
         )
         return {"type": "video", "data": base64.b64encode(data).decode(), "mime_type": mime}
 

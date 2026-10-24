@@ -358,3 +358,55 @@ async def test_apify_media_url_per_platform():
     ]
     assert (await p.media_url("instagram", "https://www.instagram.com/reel/x/")).endswith("v.mp4")
     assert await p.media_url("youtube", "https://youtube.com/shorts/x") is None
+
+
+async def test_apify_token_sent_only_to_apify_storage(monkeypatch):
+    async def public(host, port):
+        return True
+
+    monkeypatch.setattr(llm_mod, "_resolves_public", public)
+    seen = {}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen[req.url.host] = req.headers.get("authorization")
+        if req.url.host == "api.apify.com":
+            return httpx.Response(302, headers={"location": "https://v16.tiktokcdn.com/v.mp4"})
+        return httpx.Response(200, content=b"vid", headers={"content-type": "video/mp4"})
+
+    c = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    data, _ = await download_media(
+        c,
+        "https://api.apify.com/v2/key-value-stores/s/records/v",
+        1000,
+        host_auth={"api.apify.com": "Bearer apify_api_x"},
+    )
+    assert data == b"vid"
+    assert seen["api.apify.com"] == "Bearer apify_api_x"
+    assert seen["v16.tiktokcdn.com"] is None  # token never leaves Apify
+
+
+async def test_gemini_downloads_apify_media_with_token(monkeypatch):
+    async def public(host, port):
+        return True
+
+    monkeypatch.setattr(llm_mod, "_resolves_public", public)
+    auth = {}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.host == "api.apify.com":
+            auth["h"] = req.headers.get("authorization")
+            return httpx.Response(200, content=b"MP4", headers={"content-type": "video/mp4"})
+        return httpx.Response(200, json={"status": "completed", "output_text": json.dumps(GOOD)})
+
+    g = GeminiLLMProvider(
+        Settings(llm_provider="gemini", gemini_api_key="k", apify_token="apify_api_tok"),
+        httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    await g.analyze_video(
+        _ctx(
+            platform="tiktok",
+            url="https://www.tiktok.com/@a/video/1",
+            media_url="https://api.apify.com/v2/key-value-stores/s/records/v",
+        )
+    )
+    assert auth["h"] == "Bearer apify_api_tok"

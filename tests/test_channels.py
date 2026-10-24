@@ -323,3 +323,22 @@ async def test_sync_failure_is_recorded_not_raised(chan_app, client, alice):
     assert r.status_code == 201
     item = (await client.get(f"/api/v1/workspaces/{ws}/channels", headers=alice.headers)).json()[0]
     assert item["sync_status"] == "error" and item["sync_error"] == "Provider down"
+
+
+def test_youtube_duration_and_input_param():
+    from app.modules.discovery_analysis.providers import _duration
+
+    assert [_duration(x) for x in (31, "31", "0:58", "1:02:03", None, "", "abc")] == [
+        31,
+        31,
+        58,
+        3723,
+        None,
+        None,
+        None,
+    ]
+    yt = map_youtube_video({"id": "x", "duration": "00:00:45", "viewCount": 5})
+    assert yt and yt.duration_sec == 45
+    p = ApifyChannelProvider(Settings(channel_provider="apify", apify_token="t"))
+    _, payload = p._actor_and_input("youtube", "mrbeast", 60)
+    assert payload == {"channels": ["mrbeast"], "maxResultsShorts": 60}
