@@ -30,6 +30,7 @@ from app.models import (
     Workspace,
     WorkspaceChannel,
 )
+from app.modules.discovery_analysis.thumbnails import display_url
 
 
 def _aware(d: datetime | None) -> datetime | None:
@@ -332,7 +333,7 @@ async def search_videos(
                 "platform": v.platform,
                 "url": v.url,
                 "caption": v.caption,
-                "thumbnail_url": v.thumbnail_url,
+                "thumbnail_url": display_url(v),
                 "views": v.views,
                 "outlier_score": v.outlier_score,
                 "posted_at": v.posted_at,

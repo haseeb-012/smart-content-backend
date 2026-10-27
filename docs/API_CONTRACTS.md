@@ -98,6 +98,8 @@ All errors: `{"error": {"code": string, "message": string, "details": object}}`
 | GET | `/admin/billing` · `/admin/system` | 🔒 admin | Stripe setup + subscriptions + recent events · providers, key presence (yes/no), Apify spend, health |
 | GET | `/admin/audit?limit&action` | 🔒 admin | includes `actor` (email or "Admin (panel login)") and `target` email |
 
+| GET | `/thumbnails/{video_id}` | public | stored WebP copy of a video thumbnail (1-year cache) · 404 if none — feeds already return this URL in `thumbnail_url` |
+
 🔒 admin = panel token from `/admin/login`, or a Supabase token whose profile has `is_admin`.
 
 Frontends keep a copy of this file and update it when the version changes.

@@ -11,6 +11,7 @@ from app.api.v1 import (
     plans,
     social,
     studio,
+    thumbnails,
     waitlist,
     workspaces,
 )
@@ -30,3 +31,4 @@ router.include_router(workspaces.router)
 router.include_router(credits.router)
 router.include_router(waitlist.router)
 router.include_router(admin.router)
+router.include_router(thumbnails.router)

@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.errors import AppError, NotFound, PlanLimitError, RateLimited
 from app.models import AuditLog, Channel, ChannelStat, Profile, SocialAccount, Video, WorkspaceChannel
+from app.modules.discovery_analysis import thumbnails
 from app.modules.discovery_analysis.outlier import compute_outliers, engagement_rate
 from app.modules.discovery_analysis.providers import ChannelProvider, Platform, ProviderError
 from app.modules.identity.service import get_workspace_for
@@ -255,6 +256,12 @@ async def sync_channel(
             ch.sync_status, ch.sync_error, ch.last_synced_at = "ok", None, now
             await _snapshot(db, ch, sum(v.views for v in all_videos), now)
             await db.commit()
+            # Keep our own thumbnail copies before the platform's signed links expire.
+            try:
+                await thumbnails.store_missing(db, [v.id for v in all_videos])
+            except Exception:
+                log.exception("thumbnail copy failed for channel %s", channel_id)
+                await db.rollback()
         except ProviderError as e:
             await db.rollback()
             await _mark_error(session_factory, channel_id, e.message)

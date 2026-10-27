@@ -15,6 +15,10 @@
 - Collections still hold the 8 seeded **sample** collections (fake video links). Replace them in Admin → Collections ("Remove sample videos" + "Pick from your videos"), or hide them.
 - Refresh-cost change (import 100 once / manual refresh 10 newest / plan-based verified refresh) is **proposed only — do not apply without the owner's go**.
 
+- **Thumbnails kept permanently** (migration `0009`, applied to Supabase on 2026-10-27): TikTok/Instagram image links expire after ~2–5 days, so after every import the backend saves a small WebP copy (~15 KB) in `video_thumbnails` and the API returns `{PUBLIC_API_URL}/api/v1/thumbnails/{video_id}`. YouTube links don't expire and are used as-is. Back-filled 115 copies; khaby.lame re-imported (its links had expired) → 60 copies. `scripts/backfill_thumbnails.py` copies any still-valid links. DB cost ≈ 1 MB per 60-video channel — move to Supabase Storage if it grows.
+- App fixes: a creator colour now shows behind any thumbnail that fails (never a blank box); popups (e.g. Create workspace) render above the whole page instead of inside the sidebar, and focus the first field.
+- Website screenshots (`smart-content-landing/public/screens`) re-taken from the owner's real data (videos, analysis, channels, ideas, hooks, script, collections). `dashboard.png` kept until the owner's own account has real stats.
+
 **Next**
 1. Add the 3 `ADMIN_*` values on Render → Save; then sign in at `https://smart-content-dashboard.vercel.app/admin/login`. Change the temporary password to a strong one (`uv run python scripts/admin_password.py`).
 2. One real Stripe test payment; confirm the plan and the Stripe events in Admin → Billing.

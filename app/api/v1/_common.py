@@ -1,6 +1,7 @@
 from dataclasses import asdict
 
 from app.models import Channel, Profile, Video
+from app.modules.discovery_analysis.thumbnails import display_url
 from app.modules.plans_credits.plans import PlanLimits, limits_for
 from app.modules.plans_credits.service import Balance
 from app.schemas import ChannelOut, CreditsOut, FeedVideo, PlanOut
@@ -26,7 +27,7 @@ def feed_video(v: Video, c: Channel) -> FeedVideo:
         platform=v.platform,  # type: ignore[arg-type]
         url=v.url,
         caption=v.caption,
-        thumbnail_url=v.thumbnail_url,
+        thumbnail_url=display_url(v),
         posted_at=v.posted_at,
         duration_sec=v.duration_sec,
         views=v.views,

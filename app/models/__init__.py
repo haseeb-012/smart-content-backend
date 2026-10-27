@@ -14,6 +14,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -182,6 +183,19 @@ class Video(Timestamped, Base):
     engagement_rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)  # percent
     outlier_score: Mapped[float | None] = mapped_column(Float, index=True)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    # Set when we keep our own copy of the thumbnail (TikTok/Instagram links expire after a few days).
+    thumb_stored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class VideoThumbnail(Base):
+    """Small WebP copy of a video's thumbnail, served by /api/v1/thumbnails/{video_id}."""
+
+    __tablename__ = "video_thumbnails"
+
+    video_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True)
+    mime: Mapped[str] = mapped_column(String(40), nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class VideoAnalysis(Timestamped, Base):

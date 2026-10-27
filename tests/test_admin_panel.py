@@ -104,7 +104,9 @@ async def test_panel_manages_users_and_audit_shows_panel_admin(client, panel, bo
     assert r.status_code == 200 and r.json()["profile"]["mcp_enabled"] is True
     r = await client.patch(f"/api/v1/admin/users/{uid}/plan", headers=h, json={"plan": "titan"})
     assert r.json()["profile"]["plan"] == "titan"
-    r = await client.post(f"/api/v1/admin/users/{uid}/credits", headers=h, json={"amount": 25, "reason": "support"})
+    r = await client.post(
+        f"/api/v1/admin/users/{uid}/credits", headers=h, json={"amount": 25, "reason": "support"}
+    )
     assert r.json()["credits"]["adjustments"] == 25
 
     usage = (await client.get(f"/api/v1/admin/users/{uid}/usage", headers=h)).json()
@@ -120,7 +122,9 @@ async def test_overview_lists_and_system(client, app, sessionmaker, panel, alice
     h = await _panel_headers(client)
     ws = (await client.post("/api/v1/workspaces", headers=alice.headers, json={"name": "W"})).json()["id"]
     r = await client.post(
-        f"/api/v1/workspaces/{ws}/channels", headers=alice.headers, json={"platform": "tiktok", "handle": "demo"}
+        f"/api/v1/workspaces/{ws}/channels",
+        headers=alice.headers,
+        json={"platform": "tiktok", "handle": "demo"},
     )
     assert r.status_code == 201
 

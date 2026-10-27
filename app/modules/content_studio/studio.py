@@ -29,6 +29,7 @@ from app.models import (
 )
 from app.modules.discovery_analysis.analysis import get_workspace_video
 from app.modules.discovery_analysis.llm import LLMProvider, ScriptBlocks
+from app.modules.discovery_analysis.thumbnails import display_url
 from app.modules.identity.service import get_workspace_for
 from app.modules.plans_credits.service import consume, ensure_available
 
@@ -409,7 +410,7 @@ async def resolve_items(db: AsyncSession, items: list[ProjectItem]) -> list[dict
                 | {
                     "title": (v.caption.split("\n")[0][:140] or "Untitled video"),
                     "subtitle": f"@{c.handle} · {v.views:,} views",
-                    "thumbnail_url": v.thumbnail_url,
+                    "thumbnail_url": display_url(v),
                     "platform": v.platform,
                 }
             )
