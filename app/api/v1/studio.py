@@ -7,10 +7,11 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import admin_profile, current_profile
-from app.core.errors import NotFound
+from app.core.deps import AdminActor, admin_actor, current_profile
+from app.core.errors import Conflict, NotFound
 from app.core.ratelimit import RateLimiter
 from app.db.session import get_db
 from app.models import AuditLog, ExportRecord, HookTemplate, Profile, Project, SavedHook, Script
@@ -74,18 +75,22 @@ async def hook_library(
 
 @admin_router.post("/hooks", response_model=HookOut, status_code=status.HTTP_201_CREATED)
 async def admin_add_hook(
-    body: HookIn, admin: Profile = Depends(admin_profile), db: AsyncSession = Depends(get_db)
+    body: HookIn, admin: AdminActor = Depends(admin_actor), db: AsyncSession = Depends(get_db)
 ):
     h = HookTemplate(**body.model_dump())
     db.add(h)
     db.add(AuditLog(actor_id=admin.id, action="hooks.create", details={"text": body.text[:120]}))
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        raise Conflict("That hook is already in the library.", code="duplicate_hook") from e
     return HookOut.model_validate(h)
 
 
 @admin_router.delete("/hooks/{hook_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_delete_hook(
-    hook_id: uuid.UUID, admin: Profile = Depends(admin_profile), db: AsyncSession = Depends(get_db)
+    hook_id: uuid.UUID, admin: AdminActor = Depends(admin_actor), db: AsyncSession = Depends(get_db)
 ) -> Response:
     h = await db.get(HookTemplate, hook_id)
     if h is None:

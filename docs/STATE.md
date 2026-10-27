@@ -1,6 +1,39 @@
-# Backend — current state (2026-10-23)
+# Backend — current state (2026-10-27)
 
-## ▶ Resume here (status at end of 2026-10-23)
+## ▶ Resume here (status at end of 2026-10-27)
+
+**Live and deployed.** 131 backend tests green.
+- Backend: Render — `https://smart-content-backend-k2qh.onrender.com` (free plan: sleeps after 15 min, ~50 s wake-up).
+- App: `https://smart-content-dashboard.vercel.app` · Website: `https://smart-content-landing.vercel.app` (links to the app fixed).
+- Real services on: Supabase DB + Auth, Gemini `gemini-3.8-flash`, Apify (free plan, **$5/month — $3.47 left on 2026-10-27**, resets 2026-11-10).
+
+**2026-10-27**
+- Full live feature test: 31/31 passed (TikTok/YouTube/Instagram import, Deep Analysis on all 3 incl. Instagram, scripts, hooks, ideas, niche search, bio verification, MCP, credits) + Stripe test checkout for all 6 prices + portal.
+- Stripe: Render has `BILLING_PROVIDER=stripe_test` + webhook secret. A signed test event to the live webhook returned 200 (test row removed). Stripe destination "Smart_content" is Active with 6 events. **Not yet done: one real test payment (card 4242…) to see a subscription saved.**
+- Apify free plan has a 16 GB memory cap: niche search launches ~6 TikTok lookups at 4 GB each, so some get refused (402). Owner chose not to change it for now. Fix if needed: cap concurrent Apify runs at 3 and request 2 GB per run.
+- **Admin panel built** (dashboard `/admin`, see "Done — Admin panel" below). Login is defined in env: `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET` (local `.env` + `deploy-env/render-backend.env` filled; **must be added on Render**).
+- Collections still hold the 8 seeded **sample** collections (fake video links). Replace them in Admin → Collections ("Remove sample videos" + "Pick from your videos"), or hide them.
+- Refresh-cost change (import 100 once / manual refresh 10 newest / plan-based verified refresh) is **proposed only — do not apply without the owner's go**.
+
+**Next**
+1. Add the 3 `ADMIN_*` values on Render → Save; then sign in at `https://smart-content-dashboard.vercel.app/admin/login`. Change the temporary password to a strong one (`uv run python scripts/admin_password.py`).
+2. One real Stripe test payment; confirm the plan and the Stripe events in Admin → Billing.
+3. Replace sample collections with real outliers.
+4. Rotate the secrets that were pasted in chat (DB password, Gemini key, Apify token, Stripe key) and update Render.
+5. Watch Apify credit in Admin → System & costs.
+
+**Run locally**
+- Backend: `cd smart-content-backend && uv run uvicorn app.main:app --port 8000` (uses `.env`; the real Supabase DB).
+- Dashboard: `cd smart-content-dashboard && npm run dev -- -p 3001` (live mode — `.env.local` has Supabase + API URL).
+- Landing: `cd smart-content-landing && npm run dev` → :3000.
+
+## Done — Admin panel (2026-10-27)
+- Dashboard `/admin` (own sign-in at `/admin/login`, hidden from search engines). Pages: Overview (counts + 30-day charts), System & costs (services, which keys are set — yes/no only, Apify spend, failed imports, stuck analyses), Users (search/filter, CSV) + user detail (plan, credits +/- with reason, MCP and admin switches, usage, credit history, social accounts), Billing (Stripe setup checks, recent events, subscriptions), Waitlist (search, CSV), Collections (create, edit, cover, publish/hide, delete, remove sample videos, add videos from real outliers with transcript + analysis, or by link), Hook library (add/edit/hide/delete), Channels (status, errors, re-import), Analyses (status filter, errors), Audit log (filter).
+- Access: the env admin login (PBKDF2 hash, 8 h HS256 token with its own audience — rejected on normal app routes; 5 tries/15 min per IP + 30 failures/h overall; changing `ADMIN_EMAIL` or the secret signs everyone out), **or** a Supabase account with `is_admin` (they also see an "Admin panel" link in the app sidebar). The env admin has no Supabase account; its audit rows show "Admin (panel login)".
+- New API: `POST /admin/login`, `GET /admin/session|stats|system|billing|users|users/{id}/usage|channels|analyses|videos|hooks`, `POST /admin/channels/{id}/resync`, `PATCH /admin/hooks/{id}`; duplicate hook → 409 `duplicate_hook`.
+- Tested: 12 new backend tests; admin API against the real DB 16/16; browser test of every page 21/21 (login, wrong password, all pages, user detail, collection editor + picker, phone width, sign out, no page errors).
+
+## Earlier resume notes (2026-10-23, kept for history)
 
 **All product features are built and pushed.** 116 backend tests green; live e2e passed for every module.
 

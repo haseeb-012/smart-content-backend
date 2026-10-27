@@ -17,6 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.admin_auth import AdminActor
 from app.core.errors import CreditsExhausted
 from app.models import AuditLog, CreditLedger, Profile
 from app.modules.plans_credits.plans import limits_for
@@ -134,7 +135,7 @@ async def consume(
 
 
 async def adjust(
-    db: AsyncSession, *, actor: Profile, target: Profile, amount: int, reason: str
+    db: AsyncSession, *, actor: AdminActor, target: Profile, amount: int, reason: str
 ) -> CreditLedger:
     """Admin credit adjustment for the current period (FR-BILL-10). Audited. Commits."""
     entry = CreditLedger(

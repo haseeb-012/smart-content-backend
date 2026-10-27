@@ -10,8 +10,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.admin_auth import AdminActor
 from app.core.errors import Conflict, NotFound
-from app.models import AuditLog, Collection, CollectionVideo, Profile
+from app.models import AuditLog, Collection, CollectionVideo
 
 CATEGORY_LABELS = {
     "formats": "Formats",
@@ -132,7 +133,7 @@ def export_collection(c: Collection, fmt: Literal["markdown", "json"]) -> str:
 # ---------------------------------------------------------------- admin (curation)
 
 
-def _audit(db: AsyncSession, actor: Profile, action: str, c: Collection, **extra: object) -> None:
+def _audit(db: AsyncSession, actor: AdminActor, action: str, c: Collection, **extra: object) -> None:
     db.add(
         AuditLog(
             actor_id=actor.id,
@@ -142,7 +143,7 @@ def _audit(db: AsyncSession, actor: Profile, action: str, c: Collection, **extra
     )
 
 
-async def create_collection(db: AsyncSession, actor: Profile, data: dict) -> Collection:
+async def create_collection(db: AsyncSession, actor: AdminActor, data: dict) -> Collection:
     c = Collection(**data)
     db.add(c)
     try:
@@ -165,7 +166,7 @@ async def _by_id(db: AsyncSession, collection_id: uuid.UUID) -> Collection:
 
 
 async def update_collection(
-    db: AsyncSession, actor: Profile, collection_id: uuid.UUID, data: dict
+    db: AsyncSession, actor: AdminActor, collection_id: uuid.UUID, data: dict
 ) -> Collection:
     c = await _by_id(db, collection_id)
     for k, v in data.items():
@@ -180,14 +181,14 @@ async def update_collection(
     return await get_collection(db, c.slug, include_unpublished=True)
 
 
-async def delete_collection(db: AsyncSession, actor: Profile, collection_id: uuid.UUID) -> None:
+async def delete_collection(db: AsyncSession, actor: AdminActor, collection_id: uuid.UUID) -> None:
     c = await _by_id(db, collection_id)
     _audit(db, actor, "collection.delete", c)
     await db.delete(c)
     await db.commit()
 
 
-async def add_video(db: AsyncSession, actor: Profile, collection_id: uuid.UUID, data: dict) -> Collection:
+async def add_video(db: AsyncSession, actor: AdminActor, collection_id: uuid.UUID, data: dict) -> Collection:
     c = await _by_id(db, collection_id)
     if data.get("position") is None:
         data["position"] = max((v.position for v in c.videos), default=-1) + 1
@@ -205,7 +206,7 @@ async def add_video(db: AsyncSession, actor: Profile, collection_id: uuid.UUID, 
 
 
 async def remove_video(
-    db: AsyncSession, actor: Profile, collection_id: uuid.UUID, video_id: uuid.UUID
+    db: AsyncSession, actor: AdminActor, collection_id: uuid.UUID, video_id: uuid.UUID
 ) -> Collection:
     c = await _by_id(db, collection_id)
     v = next((x for x in c.videos if x.id == video_id), None)

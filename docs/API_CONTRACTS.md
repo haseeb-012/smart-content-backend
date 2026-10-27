@@ -86,5 +86,18 @@ All errors: `{"error": {"code": string, "message": string, "details": object}}`
 | PATCH | `/admin/users/{id}/flags` | 🔒 admin | `{mcp_enabled?, is_admin?}` → `{profile, credits}` (audited) |
 | GET | `/admin/audit?limit=100` | 🔒 admin | → `AuditEntry[]` |
 | GET | `/admin/waitlist` | 🔒 admin | → `{email, plan, source, created_at}[]` |
+| POST | `/admin/login` | public | `{email, password}` → `{token, expires_at, email, source:"panel"}` · `invalid_credentials` (401) · `rate_limited` (429) · `admin_login_disabled` (404) |
+| GET | `/admin/session` | 🔒 admin | → `{email, source: "panel" or "supabase"}` |
+| GET | `/admin/stats` | 🔒 admin | users / content / library counts, `credits_used_30d`, `signups_by_day[30]`, `analyses_by_day[30]` |
+| GET | `/admin/users?q&plan&limit&offset` | 🔒 admin | → `{items:[{profile, credits, subscription_status, workspaces, analyses, last_credit_use}], total}` |
+| GET | `/admin/users/{id}/usage` | 🔒 admin | workspaces, counts, last 25 ledger rows, social accounts, billing |
+| GET · POST | `/admin/channels?status&platform&q&limit&offset` · `/admin/channels/{id}/resync` | 🔒 admin | list with `workspaces` count · re-import (202, uses Apify credit) |
+| GET | `/admin/analyses?status&limit&offset` | 🔒 admin | with video, channel, user email, error |
+| GET | `/admin/videos?q&platform&min_outlier&limit` | 🔒 admin | best outliers across all channels + completed analysis (for collection examples) |
+| GET · PATCH | `/admin/hooks` · `/admin/hooks/{id}` | 🔒 admin | all hooks incl. hidden · edit/hide (`duplicate_hook` 409) |
+| GET | `/admin/billing` · `/admin/system` | 🔒 admin | Stripe setup + subscriptions + recent events · providers, key presence (yes/no), Apify spend, health |
+| GET | `/admin/audit?limit&action` | 🔒 admin | includes `actor` (email or "Admin (panel login)") and `target` email |
+
+🔒 admin = panel token from `/admin/login`, or a Supabase token whose profile has `is_admin`.
 
 Frontends keep a copy of this file and update it when the version changes.

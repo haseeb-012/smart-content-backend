@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import admin_profile
+from app.core.deps import AdminActor, admin_actor
 from app.core.ratelimit import RateLimiter, client_key
 from app.db.session import get_db
-from app.models import Collection, Profile
+from app.models import Collection
 from app.modules.content_studio import collections as svc
 from app.schemas import (
     CollectionCategory,
@@ -91,20 +91,20 @@ async def export_collection(
 
 
 @admin_router.get("", response_model=list[CollectionSummary])
-async def admin_list(_: Profile = Depends(admin_profile), db: AsyncSession = Depends(get_db)):
+async def admin_list(_: AdminActor = Depends(admin_actor), db: AsyncSession = Depends(get_db)):
     return [
         _summary(c, n) for c, n in await svc.list_collections(db, sort="recent", include_unpublished=True)
     ]
 
 
 @admin_router.get("/{slug}", response_model=CollectionDetail)
-async def admin_get(slug: str, _: Profile = Depends(admin_profile), db: AsyncSession = Depends(get_db)):
+async def admin_get(slug: str, _: AdminActor = Depends(admin_actor), db: AsyncSession = Depends(get_db)):
     return _detail(await svc.get_collection(db, slug, include_unpublished=True))
 
 
 @admin_router.post("", response_model=CollectionDetail, status_code=status.HTTP_201_CREATED)
 async def admin_create(
-    body: CollectionCreate, actor: Profile = Depends(admin_profile), db: AsyncSession = Depends(get_db)
+    body: CollectionCreate, actor: AdminActor = Depends(admin_actor), db: AsyncSession = Depends(get_db)
 ):
     return _detail(await svc.create_collection(db, actor, body.model_dump()))
 
@@ -113,7 +113,7 @@ async def admin_create(
 async def admin_update(
     collection_id: uuid.UUID,
     body: CollectionUpdate,
-    actor: Profile = Depends(admin_profile),
+    actor: AdminActor = Depends(admin_actor),
     db: AsyncSession = Depends(get_db),
 ):
     return _detail(await svc.update_collection(db, actor, collection_id, body.model_dump(exclude_none=True)))
@@ -121,7 +121,7 @@ async def admin_update(
 
 @admin_router.delete("/{collection_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_delete(
-    collection_id: uuid.UUID, actor: Profile = Depends(admin_profile), db: AsyncSession = Depends(get_db)
+    collection_id: uuid.UUID, actor: AdminActor = Depends(admin_actor), db: AsyncSession = Depends(get_db)
 ) -> Response:
     await svc.delete_collection(db, actor, collection_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -133,7 +133,7 @@ async def admin_delete(
 async def admin_add_video(
     collection_id: uuid.UUID,
     body: CollectionVideoIn,
-    actor: Profile = Depends(admin_profile),
+    actor: AdminActor = Depends(admin_actor),
     db: AsyncSession = Depends(get_db),
 ):
     return _detail(await svc.add_video(db, actor, collection_id, body.model_dump()))
@@ -143,7 +143,7 @@ async def admin_add_video(
 async def admin_remove_video(
     collection_id: uuid.UUID,
     video_id: uuid.UUID,
-    actor: Profile = Depends(admin_profile),
+    actor: AdminActor = Depends(admin_actor),
     db: AsyncSession = Depends(get_db),
 ):
     return _detail(await svc.remove_video(db, actor, collection_id, video_id))

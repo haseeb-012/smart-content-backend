@@ -27,6 +27,14 @@ class RateLimiter:
             )
         q.append(now)
 
+    def exhausted(self, key: str) -> bool:
+        """True if `key` is out of budget right now (doesn't record a hit)."""
+        now = time.monotonic()
+        q = self.hits.get(key)
+        while q and now - q[0] > self.window:
+            q.popleft()
+        return bool(q) and len(q) >= self.limit  # type: ignore[arg-type]
+
     def reset(self) -> None:
         self.hits.clear()
 

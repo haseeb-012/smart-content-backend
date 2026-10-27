@@ -19,6 +19,9 @@ os.environ.update(
         "STRIPE_WEBHOOK_SECRET": "",
         "APIFY_TOKEN": "",
         "GEMINI_API_KEY": "",
+        "ADMIN_EMAIL": "",
+        "ADMIN_PASSWORD_HASH": "",
+        "ADMIN_SESSION_SECRET": "",
         **{f"STRIPE_PRICE_{p}_{c}": "" for p in ("PRO", "VISIONARY", "TITAN") for c in ("MONTHLY", "YEARLY")},
     }
 )

@@ -34,3 +34,4 @@
 - Passkeys (FR-AUTH-05): check Supabase native support before Phase 3; otherwise defer to v1.1.
 - Final logo, domain, brand colour (currently placeholder mark, violet `#7c5cff`, `smartcontent.example`).
 - Logged-in Sandcastles HAR files to refine the dashboard to the real app.
+| D27 | 2026-10-27 | Admin panel at dashboard `/admin`. Owner asked for an admin login defined in env: implemented as `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH` (PBKDF2-SHA256, never the plain password) + `ADMIN_SESSION_SECRET`, issuing an 8 h HS256 token with audience `smart-content-admin` that only `/admin/*` accepts. Not a Supabase user (profiles must reference `auth.users`), so its audit rows have no actor_id and show "Admin (panel login)". Supabase users with `is_admin` keep working. Login rate-limited per IP and overall. REA couldn't inform this screen: the reference's admin tools are private and the REA MCP server didn't connect. | Owner request; auth secrets stay server-side. |

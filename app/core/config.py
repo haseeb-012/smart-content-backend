@@ -68,6 +68,13 @@ class Settings(BaseSettings):
     # Per-user cost cap (PRD §18 open item → safe default): Deep Analyses started per user per day.
     analysis_daily_limit: int = 50
 
+    # Admin panel login (dashboard /admin). Separate from Supabase: the admin is defined here, not
+    # as a Supabase user. Store only a hash: `uv run python scripts/admin_password.py`.
+    admin_email: str = ""
+    admin_password_hash: str = ""  # pbkdf2_sha256$<iterations>$<salt>$<hash>
+    admin_session_secret: str = ""  # random, 32+ chars; signs admin session tokens
+    admin_session_hours: int = Field(default=8, ge=1, le=72)
+
     # Credits
     default_plan: Literal["pro", "visionary", "titan"] = "pro"
 
@@ -92,7 +99,19 @@ class Settings(BaseSettings):
                 raise ValueError("BILLING_PROVIDER=stripe_test needs a test key (rk_test_… or sk_test_…).")
             if not self.stripe_webhook_secret.startswith("whsec_"):
                 raise ValueError("BILLING_PROVIDER=stripe_test needs STRIPE_WEBHOOK_SECRET (whsec_…).")
+        if self.admin_email:
+            if not self.admin_password_hash.startswith("pbkdf2_sha256$"):
+                raise ValueError(
+                    "ADMIN_EMAIL is set but ADMIN_PASSWORD_HASH is missing or not a hash "
+                    "(make one with: uv run python scripts/admin_password.py)."
+                )
+            if len(self.admin_session_secret) < 32:
+                raise ValueError("ADMIN_SESSION_SECRET must be at least 32 random characters.")
         return self
+
+    @property
+    def admin_login_enabled(self) -> bool:
+        return bool(self.admin_email and self.admin_password_hash and self.admin_session_secret)
 
     @property
     def stripe_prices(self) -> dict[tuple[str, str], str]:
